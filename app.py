@@ -264,7 +264,7 @@ def home():
 
     # Count how many are ready to send
     ready_count = conn.execute(
-        "SELECT COUNT(*) FROM pipeline_runs WHERE status IN ('ready','partial','timeout')"
+        "SELECT COUNT(*) FROM pipeline_runs WHERE status IN ('ready','partial','timeout','paused')"
     ).fetchone()[0]
 
     history = get_search_history(limit=5)
@@ -344,13 +344,13 @@ def send_all_ready():
 
     conn = get_db()
     ready_runs = conn.execute(
-        "SELECT id FROM pipeline_runs WHERE status IN ('ready','partial','timeout')"
+        "SELECT id FROM pipeline_runs WHERE status IN ('ready','partial','timeout','paused')"
     ).fetchall()
     conn.close()
 
     if not ready_runs:
         _send_all_running = False
-        flash("No ready pipelines found.", "warning")
+        flash("No resumable pipelines found.", "warning")
         return redirect(url_for("home"))
 
     ids = [row["id"] for row in ready_runs]
