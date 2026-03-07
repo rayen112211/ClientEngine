@@ -99,6 +99,47 @@
                         Pause pipeline on bounce (recommended)
                     </label>
                 </div>
+
+                <hr style="border-color: rgba(148,163,184,0.15); margin: 1rem 0">
+                <p style="font-weight:600; margin-bottom:.75rem;">Pipeline Reliability</p>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:.75rem;">
+                    <div class="form-group">
+                        <label>Search Timeout (seconds)</label>
+                        <input type="number" name="search_timeout_seconds"
+                            value="{{ settings.get('search_timeout_seconds', '900') }}" min="120" max="7200">
+                    </div>
+                    <div class="form-group">
+                        <label>Discovery Timeout (seconds)</label>
+                        <input type="number" name="discovery_timeout_seconds"
+                            value="{{ settings.get('discovery_timeout_seconds', '180') }}" min="30" max="1800">
+                    </div>
+                    <div class="form-group">
+                        <label>Per-Lead Timeout (seconds)</label>
+                        <input type="number" name="lead_timeout_seconds"
+                            value="{{ settings.get('lead_timeout_seconds', '45') }}" min="5" max="300">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Search Results</label>
+                        <input type="number" name="search_max_results"
+                            value="{{ settings.get('search_max_results', '80') }}" min="5" max="200">
+                    </div>
+                    <div class="form-group">
+                        <label>Lead Fetch Connect Timeout (seconds)</label>
+                        <input type="number" step="0.5" name="lead_fetch_connect_timeout_seconds"
+                            value="{{ settings.get('lead_fetch_connect_timeout_seconds', '4') }}" min="1" max="30">
+                    </div>
+                    <div class="form-group">
+                        <label>Lead Fetch Read Timeout (seconds)</label>
+                        <input type="number" step="0.5" name="lead_fetch_read_timeout_seconds"
+                            value="{{ settings.get('lead_fetch_read_timeout_seconds', '7') }}" min="1" max="45">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="search_debug" {{ 'checked' if settings.get('search_debug','false')=='true' }}>
+                        Enable pipeline debug logs (data/pipeline_events.log)
+                    </label>
+                </div>
             </div>
             <div class="card-footer">
                 <button type="submit" class="btn btn-primary">Save Settings</button>

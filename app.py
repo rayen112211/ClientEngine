@@ -1428,6 +1428,11 @@ def settings_page():
 
 @app.route("/settings/update", methods=["POST"])
 def update_settings_route():
+    send_delay_min = _setting_int(request.form, "send_delay_min", 30, minimum=5, maximum=600)
+    send_delay_max = _setting_int(request.form, "send_delay_max", 60, minimum=5, maximum=900)
+    if send_delay_max < send_delay_min:
+        send_delay_max = send_delay_min
+
     data = {
         "smtp_host": request.form.get("smtp_host", "mail.spacemail.com"),
         "smtp_port": request.form.get("smtp_port", "465"),
@@ -1439,11 +1444,18 @@ def update_settings_route():
         "reply_to": request.form.get("reply_to", ""),
         "portfolio_link": request.form.get("portfolio_link", ""),
         "google_places_api_key": request.form.get("google_places_api_key", ""),
-        "send_delay_min": request.form.get("send_delay_min", "30"),
-        "send_delay_max": request.form.get("send_delay_max", "60"),
-        "micro_test_size": request.form.get("micro_test_size", "2"),
+        "send_delay_min": str(send_delay_min),
+        "send_delay_max": str(send_delay_max),
+        "micro_test_size": str(_setting_int(request.form, "micro_test_size", 2, minimum=1, maximum=10)),
         "micro_test_enabled": "true" if request.form.get("micro_test_enabled") == "on" else "false",
         "pause_on_bounce": "true" if request.form.get("pause_on_bounce") == "on" else "false",
+        "search_timeout_seconds": str(_setting_int(request.form, "search_timeout_seconds", SEARCH_TIMEOUT_SECONDS, minimum=120, maximum=7200)),
+        "discovery_timeout_seconds": str(_setting_int(request.form, "discovery_timeout_seconds", DISCOVERY_TIMEOUT_SECONDS, minimum=30, maximum=1800)),
+        "lead_timeout_seconds": str(_setting_int(request.form, "lead_timeout_seconds", LEAD_TIMEOUT_SECONDS, minimum=5, maximum=300)),
+        "lead_fetch_connect_timeout_seconds": str(_setting_float(request.form, "lead_fetch_connect_timeout_seconds", LEAD_FETCH_CONNECT_TIMEOUT_SECONDS, minimum=1.0, maximum=30.0)),
+        "lead_fetch_read_timeout_seconds": str(_setting_float(request.form, "lead_fetch_read_timeout_seconds", LEAD_FETCH_READ_TIMEOUT_SECONDS, minimum=1.0, maximum=45.0)),
+        "search_max_results": str(_setting_int(request.form, "search_max_results", SEARCH_MAX_RESULTS, minimum=5, maximum=200)),
+        "search_debug": "true" if request.form.get("search_debug") == "on" else "false",
     }
     update_settings(data)
     flash("Settings saved âœ“", "success")
