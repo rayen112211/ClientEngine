@@ -1,5 +1,5 @@
-﻿{% extends "base.html" %}
-{% block title %}Results â€” ClientEngine{% endblock %}
+{% extends "base.html" %}
+{% block title %}Results — ClientEngine{% endblock %}
 {% block content %}
 
 <div class="page-header">
@@ -11,33 +11,33 @@
 <div class="pipeline-progress" id="pipelineProgress">
     <div
         class="pipeline-step {% if run.status in ('pending','discovering','extracting','scoring','ready','partial','timeout','no_emails','no_website','sending','done','error','failed','paused') %}done{% endif %}">
-        <div class="ps-icon">ðŸ”</div>
+        <div class="ps-icon">🔍</div>
         <div class="ps-label">Found</div>
         <div class="ps-value" id="count-found">{{ metrics.found if metrics else run.found }}</div>
     </div>
     <div class="pipeline-connector"></div>
     <div
         class="pipeline-step {% if run.status in ('extracting','scoring','ready','partial','timeout','no_emails','no_website','sending','done','error','failed','paused') %}done{% endif %}">
-        <div class="ps-icon">ðŸŒ</div>
+        <div class="ps-icon">🌐</div>
         <div class="ps-label">With Website</div>
         <div class="ps-value" id="count-website">{{ metrics.with_website if metrics else run.with_website }}</div>
     </div>
     <div class="pipeline-connector"></div>
     <div class="pipeline-step {% if run.status in ('scoring','ready','partial','timeout','no_emails','no_website','sending','done','error','failed','paused') %}done{% endif %}">
-        <div class="ps-icon">ðŸ“§</div>
+        <div class="ps-icon">📧</div>
         <div class="ps-label">Emails Found</div>
         <div class="ps-value" id="count-email">{{ metrics.with_email if metrics else run.with_email }}</div>
     </div>
     <div class="pipeline-connector"></div>
     <div class="pipeline-step {% if run.status in ('ready','partial','timeout','no_emails','no_website','sending','done','error','failed','paused') %}done{% endif %} highlight">
-        <div class="ps-icon">âœ…</div>
+        <div class="ps-icon">✅</div>
         <div class="ps-label">Qualified</div>
         <div class="ps-value" id="count-qualified">{{ metrics.qualified if metrics else run.qualified }}</div>
     </div>
     {% if run.sent > 0 %}
     <div class="pipeline-connector"></div>
     <div class="pipeline-step done">
-        <div class="ps-icon">ðŸš€</div>
+        <div class="ps-icon">🚀</div>
         <div class="ps-label">Sent</div>
         <div class="ps-value">{{ run.sent }}</div>
     </div>
@@ -80,14 +80,25 @@
 {% endif %}
 
 <!-- Actions -->
-{% if run.status in ('ready', 'partial', 'timeout', 'no_emails', 'no_website', 'error', 'failed') and qualified %}
+{% if run.status in ('ready', 'partial', 'timeout', 'no_emails', 'no_website', 'error', 'failed', 'paused') and qualified %}
 <div class="actions-bar">
     <form method="POST" action="/send/{{ pipeline_id }}">
         <button type="submit" class="btn btn-accent btn-lg">
+            {% if run.status == 'paused' %}
+            Resume Sending ({{ qualified|length }})
+            {% else %}
             Send {{ qualified|length }} Emails Now
+            {% endif %}
         </button>
     </form>
     <a href="/" class="btn btn-outline">New Search</a>
+</div>
+{% elif run.status == 'sending' %}
+<div class="actions-bar">
+    <div class="alert alert-warning" style="margin:0;">
+        Sending is in progress. You can monitor live progress on Analytics.
+    </div>
+    <a href="/analytics" class="btn btn-outline">Open Analytics</a>
 </div>
 {% elif run.status in ('error', 'failed', 'partial', 'timeout') and not qualified %}
 <div class="alert alert-error" style="margin-bottom: 1rem;">
@@ -109,35 +120,16 @@
     <a href="/" class="btn btn-outline">Try Different Search</a>
 </div>
 {% endif %}
-</div>
-<div class="actions-bar">
-    <form method="POST" action="/send/{{ pipeline_id }}">
-        <button type="submit" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">
-            ðŸ”„ Resume Sending ({{ qualified|length }})
-        </button>
-    </form>
-    <a href="/" class="btn btn-outline">â† New Search</a>
-</div>
-{% elif run.status == 'done' %}
-<div class="actions-bar">
-    <a href="/analytics" class="btn btn-primary">ðŸ“Š View Analytics</a>
-    <a href="/" class="btn btn-outline">â† New Search</a>
-</div>
-{% elif run.status in ('ready', 'partial', 'no_emails', 'no_website', 'timeout') and not qualified %}
-<div class="actions-bar">
-    <a href="/" class="btn btn-outline">â† Try Different Search</a>
-</div>
-{% endif %}
 
 <!-- Qualified Businesses (Email Previews) -->
 {% if qualified %}
-<h2 style="margin: 2rem 0 1rem">ðŸ“§ Emails Ready to Send ({{ qualified|length }})</h2>
+<h2 style="margin: 2rem 0 1rem">📧 Emails Ready to Send ({{ qualified|length }})</h2>
 {% for biz in qualified %}
 <div class="card email-card">
     <div class="card-header">
         <div style="display:flex;align-items:center;gap:0.75rem">
             <strong>{{ biz.business_name }}</strong>
-            <span class="text-muted">â†’ {{ biz.email }}</span>
+            <span class="text-muted">→ {{ biz.email }}</span>
         </div>
         <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
             {% if biz.dispatch_status == 'sent' %}
@@ -153,48 +145,48 @@
             <!-- Source Badge -->
             {% if biz.source == 'google_maps' %}
             <span class="status-badge"
-                style="background: rgba(66, 133, 244, 0.1); color: #4285F4; border-color: rgba(66, 133, 244, 0.2);">ðŸ“
+                style="background: rgba(66, 133, 244, 0.1); color: #4285F4; border-color: rgba(66, 133, 244, 0.2);">📍
                 Maps</span>
             {% elif biz.source == 'instagram' %}
             <span class="status-badge"
-                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">ðŸ“¸
+                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">📸
                 Instagram</span>
             {% elif biz.source == 'facebook' %}
             <span class="status-badge"
-                style="background: rgba(24, 119, 242, 0.1); color: #1877F2; border-color: rgba(24, 119, 242, 0.2);">ðŸ“˜
+                style="background: rgba(24, 119, 242, 0.1); color: #1877F2; border-color: rgba(24, 119, 242, 0.2);">📘
                 Facebook</span>
             {% elif biz.source == 'directories' %}
             <span class="status-badge"
-                style="background: rgba(211, 35, 35, 0.1); color: #d32323; border-color: rgba(211, 35, 35, 0.2);">ðŸ“‹
+                style="background: rgba(211, 35, 35, 0.1); color: #d32323; border-color: rgba(211, 35, 35, 0.2);">📋
                 Yelp</span>
             {% endif %}
 
             <!-- Tier Badge -->
             {% if biz.tier == 1 %}
             <span class="status-badge"
-                style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">ðŸ”¥
+                style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">🔥
                 Tier 1</span>
             {% elif biz.tier == 2 %}
             <span class="status-badge"
-                style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);">âš¡
+                style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);">⚡
                 Tier 2</span>
             {% else %}
             <span class="status-badge"
-                style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.3);">â„ï¸
+                style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.3);">❄️
                 Tier 3</span>
             {% endif %}
 
             <!-- Channel Badge -->
             {% if biz.outreach_channel == 'instagram_dm' %}
             <span class="status-badge"
-                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">ðŸ“¸
+                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">📸
                 IG DM</span>
             {% elif biz.outreach_channel == 'whatsapp' %}
             <span class="status-badge"
-                style="background: rgba(37, 211, 102, 0.1); color: #25D366; border-color: rgba(37, 211, 102, 0.2);">ðŸ’¬
+                style="background: rgba(37, 211, 102, 0.1); color: #25D366; border-color: rgba(37, 211, 102, 0.2);">💬
                 WhatsApp</span>
             {% else %}
-            <span class="status-badge status-active">ðŸ“§ Email</span>
+            <span class="status-badge status-active">📧 Email</span>
             {% endif %}
 
             <span
@@ -216,10 +208,10 @@
         </div>
         {% endif %}
         <div class="email-meta">
-            {% if biz.google_rating %}<span>â­ {{ biz.google_rating }}</span>{% endif %}
-            {% if biz.review_count %}<span>ðŸ“Š {{ biz.review_count }} reviews</span>{% endif %}
-            {% if biz.city %}<span>ðŸ“ {{ biz.city }}</span>{% endif %}
-            {% if biz.pain_points %}<span class="pain-tag">ðŸŽ¯ {{ biz.pain_points|join(', ') }}</span>{% endif %}
+            {% if biz.google_rating %}<span>⭐ {{ biz.google_rating }}</span>{% endif %}
+            {% if biz.review_count %}<span>📊 {{ biz.review_count }} reviews</span>{% endif %}
+            {% if biz.city %}<span>📍 {{ biz.city }}</span>{% endif %}
+            {% if biz.pain_points %}<span class="pain-tag">🎯 {{ biz.pain_points|join(', ') }}</span>{% endif %}
         </div>
         {% if biz.email_subject %}
         <div class="email-preview-block" id="preview-{{ loop.index }}">
@@ -233,12 +225,12 @@
             <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
                 <button type="button" class="btn btn-sm btn-outline" onclick="toggleEdit({{ loop.index }})"
                     style="font-size: 0.85rem;">
-                    âœï¸ Edit Email
+                    ✏️ Edit Email
                 </button>
                 <button type="button" class="btn btn-sm btn-outline"
                     onclick="skipEmail('{{ biz.email }}', {{ loop.index }})"
                     style="font-size: 0.85rem; border-color: #e74c3c; color: #e74c3c;">
-                    ðŸ—‘ï¸ Remove from Queue
+                    🗑️ Remove from Queue
                 </button>
             </div>
             {% endif %}
@@ -260,7 +252,7 @@
                 <button type="button" class="btn btn-sm btn-outline"
                     onclick="toggleEdit({{ loop.index }})">Cancel</button>
                 <button type="button" class="btn btn-sm btn-primary"
-                    onclick="saveEmail('{{ biz.email }}', {{ loop.index }}, this)">ðŸ’¾ Save Changes</button>
+                    onclick="saveEmail('{{ biz.email }}', {{ loop.index }}, this)">💾 Save Changes</button>
             </div>
         </div>
         {% endif %}
@@ -273,7 +265,7 @@
 {% if skipped %}
 <details style="margin-top:2rem">
     <summary class="text-muted" style="cursor:pointer;margin-bottom:1rem">
-        â­ï¸ Skipped businesses ({{ skipped|length }}) â€” click to show
+        ⏭️ Skipped businesses ({{ skipped|length }}) — click to show
     </summary>
     <div class="card">
         <div class="card-body no-padding">
@@ -290,7 +282,7 @@
                         {% for biz in skipped %}
                         <tr class="row-dimmed">
                             <td>{{ biz.business_name }}</td>
-                            <td>{{ biz.score or 'â€”' }}</td>
+                            <td>{{ biz.score or '—' }}</td>
                             <td class="text-muted">{{ biz.skip_reason or 'Low score' }}</td>
                         </tr>
                         {% endfor %}
@@ -319,7 +311,7 @@
         });
 
         if (res.ok) {
-            card.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-weight: 500;">ðŸ—‘ï¸ Email to ${email} removed from the queue.</div>`;
+            card.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-weight: 500;">🗑️ Email to ${email} removed from the queue.</div>`;
         } else {
             alert('Failed to skip email');
             card.style.opacity = '1';

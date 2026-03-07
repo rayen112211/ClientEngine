@@ -1,5 +1,5 @@
-﻿"""
-Email Engine â€” handles SMTP sending, sequence orchestration,
+"""
+Email Engine — handles SMTP sending, sequence orchestration,
 spam checking, bounce handling, and unsubscribe management.
 """
 import smtplib
@@ -31,9 +31,9 @@ from database import (
 from templates_data import get_template
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # PERSONALIZATION
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 def personalize(text, lead, settings):
     """Replace all {{PLACEHOLDER}} variables and process {a|b} spintax."""
@@ -78,9 +78,9 @@ def add_unsubscribe_footer(body, lead_id):
     return body + footer
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # SPAM CHECK
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 def check_spam_score(subject, body):
     """
@@ -135,13 +135,13 @@ def check_spam_score(subject, body):
         "score": min(score, 100),
         "warnings": warnings,
         "is_safe": is_safe,
-        "verdict": "âœ… Looks clean" if is_safe else "âš ï¸ May trigger spam filters",
+        "verdict": "✅ Looks clean" if is_safe else "⚠️ May trigger spam filters",
     }
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # SENDING
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 def send_email(to_email, subject, body, settings):
     """
@@ -213,12 +213,12 @@ def send_email(to_email, subject, body, settings):
         return True, None, False, False
 
     except smtplib.SMTPAuthenticationError:
-        return False, "SMTP authentication failed â€” check username/password", False, False
+        return False, "SMTP authentication failed — check username/password", False, False
     except smtplib.SMTPRecipientsRefused as e:
         return False, f"Recipient refused (bounced): {to_email}", True, False
     except smtplib.SMTPDataError as e:
         error_msg = str(e)
-        # Rate-limit errors (554 5.7.1 "too many messages") are TEMPORARY â€” NOT a bounce
+        # Rate-limit errors (554 5.7.1 "too many messages") are TEMPORARY — NOT a bounce
         # Do not mark the recipient as bounced for rate limits
         is_rate_limit = any(kw in error_msg.lower() for kw in [
             "too many messages", "rate", "policy", "rejected", "spam"
@@ -235,15 +235,15 @@ def send_email(to_email, subject, body, settings):
         return False, f"Soft fail: {error_msg}", False, False
 
     except smtplib.SMTPSenderRefused:
-        return False, "Sender address rejected â€” check From Email", False, False
+        return False, "Sender address rejected — check From Email", False, False
     except Exception as e:
         return False, str(e), False, False
 
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # PREVIEW
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 def preview_campaign_emails(campaign_id):
     """
@@ -338,9 +338,9 @@ def preview_campaign_emails(campaign_id):
     }
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # CAMPAIGN PROCESSING
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 def process_campaign(campaign_id):
     """
@@ -492,16 +492,16 @@ def process_campaign(campaign_id):
     return summary
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # TEST EMAIL
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 def send_test_email(to_email, settings=None):
     """Send a test email to verify SMTP config."""
     if not settings:
         settings = get_settings()
 
-    subject = "Test Email â€” ClientEngine"
+    subject = "Test Email — ClientEngine"
     body = """This is a test email from ClientEngine.
 
 If you received this, your SMTP configuration is working correctly!
@@ -517,5 +517,6 @@ System is ready to send campaigns.
         email=settings.get("from_email", "N/A"),
     )
 
-    success, error, _ = send_email(to_email, subject, body, settings)
+    success, error, _is_bounce, _is_rate_limited = send_email(to_email, subject, body, settings)
     return success, error
+

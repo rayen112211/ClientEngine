@@ -1,4 +1,4 @@
-﻿"""
+"""
 Email Extractor Module.
 Hardened multi-step extraction with practical validation and debug metadata.
 """
@@ -541,7 +541,10 @@ def extract_email_from_website(
 
     ranked = sorted(
         all_candidates.values(),
-        key=lambda item: (float(item.get("confidence", 0)), item.get("email", "") in COMMON_PREFIXES),
+        key=lambda item: (
+            float(item.get("confidence", 0)),
+            (item.get("email", "").split("@", 1)[0] in COMMON_PREFIXES),
+        ),
         reverse=True,
     )
     best = ranked[0]
@@ -616,3 +619,4 @@ def find_email(
     # Keep guessed options only for manual review (never auto-send to guesses).
     result["guesses"] = guess_email(business_name, website_url)
     return result
+

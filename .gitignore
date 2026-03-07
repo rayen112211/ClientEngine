@@ -22,3 +22,7 @@ Thumbs.db
 # Any random test files created during development
 test_*.py
 debug_*.py
+
+# Keep committed regression tests under tests/
+!tests/
+!tests/test_*.py
