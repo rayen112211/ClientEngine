@@ -239,6 +239,21 @@ def _start_queue_if_idle():
 # Global lock: prevents Send All from being triggered by multiple clicks at once
 _send_all_lock = threading.Lock()
 _send_all_running = False
+_send_worker_lock = threading.Lock()
+_active_send_workers = set()
+
+
+def _is_send_worker_active(pipeline_id):
+    with _send_worker_lock:
+        return pipeline_id in _active_send_workers
+
+
+def _set_send_worker_active(pipeline_id, active):
+    with _send_worker_lock:
+        if active:
+            _active_send_workers.add(pipeline_id)
+        else:
+            _active_send_workers.discard(pipeline_id)
 
 # Auto-resume queue from previous session on startup
 if _pending > 0:
@@ -1027,6 +1042,8 @@ def _do_send_pipeline(pipeline_id):
         micro_test_on = settings.get("micro_test_enabled", "true").lower() == "true"
         micro_test_size = _parse_int_setting("micro_test_size", 2, minimum=1, maximum=10)
         pause_on_bounce = settings.get("pause_on_bounce", "true").lower() == "true"
+        transient_retries = _parse_int_setting("smtp_transient_retries", 2, minimum=0, maximum=5)
+        transient_retry_delay = _parse_int_setting("smtp_transient_retry_delay_seconds", 8, minimum=1, maximum=180)
 
         micro_test_done = not micro_test_on
         micro_test_sent = 0
@@ -1065,6 +1082,21 @@ def _do_send_pipeline(pipeline_id):
             if daily_limit > 0 and daily_sent >= daily_limit:
                 return True, f"Daily quota reached ({daily_sent}/{daily_limit})."
             return False, ""
+
+        def _is_transient_send_error(error_msg):
+            text = (error_msg or "").lower()
+            if text.startswith("transient smtp error:"):
+                return True
+            transient_hints = (
+                "timed out",
+                "timeout",
+                "temporary failure",
+                "service not available",
+                "connection reset",
+                "network is unreachable",
+                "connection unexpectedly closed",
+            )
+            return any(hint in text for hint in transient_hints)
 
         for i, biz in enumerate(qualified):
             if _abort_check():
@@ -1149,43 +1181,36 @@ def _do_send_pipeline(pipeline_id):
             send_ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
             success, error_msg, is_bounce, is_rate_limited = send_email(email, subject, body_send, settings)
 
-            if is_rate_limited:
-                max_rate_retries = 3
-                wait_seconds = 3660
-
-                for retry_attempt in range(max_rate_retries):
+            if not success and not is_bounce and not is_rate_limited and _is_transient_send_error(error_msg):
+                for retry_attempt in range(transient_retries):
+                    wait_seconds = transient_retry_delay * (retry_attempt + 1)
                     _pipeline_log(
                         pipeline_id,
-                        "send_paused",
-                        f"rate limited on {email}, retry {retry_attempt + 1}/{max_rate_retries}",
+                        "send_retry",
+                        f"transient SMTP failure on {email}; retry {retry_attempt + 1}/{transient_retries} in {wait_seconds}s",
+                        level="warning",
                     )
-                    with db_session() as conn:
-                        conn.execute("UPDATE pipeline_runs SET status=? WHERE id=?", (STATUS_PAUSED, pipeline_id))
-                        conn.commit()
-                    _flush_counters()
-
-                    for _ in range(wait_seconds // 10):
+                    for _ in range(wait_seconds):
                         if _abort_check():
                             return
-                        time.sleep(10)
-
-                    with db_session() as conn:
-                        conn.execute(
-                            "UPDATE pipeline_runs SET status=? WHERE id=? AND status=?",
-                            (STATUS_SENDING, pipeline_id, STATUS_PAUSED),
-                        )
-                        conn.commit()
+                        time.sleep(1)
 
                     success, error_msg, is_bounce, is_rate_limited = send_email(email, subject, body_send, settings)
-                    if not is_rate_limited:
+                    if success or is_bounce or is_rate_limited or not _is_transient_send_error(error_msg):
                         break
 
-                if is_rate_limited:
-                    with db_session() as conn:
-                        conn.execute("UPDATE pipeline_runs SET status=? WHERE id=?", (STATUS_PAUSED, pipeline_id))
-                        conn.commit()
-                    _flush_counters()
-                    return
+            if is_rate_limited:
+                _pipeline_log(
+                    pipeline_id,
+                    "send_paused",
+                    f"rate limited on {email}; manual resume after cooldown",
+                    level="warning",
+                )
+                with db_session() as conn:
+                    conn.execute("UPDATE pipeline_runs SET status=? WHERE id=?", (STATUS_PAUSED, pipeline_id))
+                    conn.commit()
+                _flush_counters()
+                return
 
             dispatch_status = "sent" if success else ("bounced" if is_bounce else "failed")
             biz["dispatch_status"] = dispatch_status
@@ -1275,8 +1300,19 @@ def send_emails(pipeline_id):
 
         current_status = normalize_status(run["status"])
         if current_status == STATUS_SENDING:
-            flash("This batch is already sending. Check Analytics for live progress.", "warning")
-            return redirect(url_for("analytics_page"))
+            if _is_send_worker_active(pipeline_id):
+                flash("This batch is already sending. Check Analytics for live progress.", "warning")
+                return redirect(url_for("analytics_page"))
+
+            # Recover stale 'sending' status left behind by a dead worker.
+            conn.execute(
+                "UPDATE pipeline_runs SET status=? WHERE id=? AND status=?",
+                (STATUS_READY, pipeline_id, STATUS_SENDING),
+            )
+            conn.commit()
+            run = conn.execute("SELECT * FROM pipeline_runs WHERE id=?", (pipeline_id,)).fetchone()
+            current_status = normalize_status(run["status"]) if run else STATUS_READY
+            flash("Recovered stale sending state. Restarting send worker.", "warning")
 
         try:
             decoded = json.loads(run["results_json"])
@@ -1314,10 +1350,13 @@ def send_emails(pipeline_id):
         conn.close()
 
     def _send_single_worker():
+        _set_send_worker_active(pipeline_id, True)
         try:
             _do_send_pipeline(pipeline_id)
         except Exception as exc:
             _pipeline_log(pipeline_id, "send_error", f"send worker crashed: {exc}", level="error")
+        finally:
+            _set_send_worker_active(pipeline_id, False)
 
     thread = threading.Thread(target=_send_single_worker, daemon=True)
     thread.start()
@@ -1501,6 +1540,11 @@ def update_settings_route():
         "send_delay_max": str(send_delay_max),
         "smtp_hourly_limit": str(_setting_int(request.form, "smtp_hourly_limit", 500, minimum=0, maximum=500000)),
         "smtp_daily_limit": str(_setting_int(request.form, "smtp_daily_limit", 2000, minimum=0, maximum=500000)),
+        "smtp_timeout_seconds": str(_setting_int(request.form, "smtp_timeout_seconds", 20, minimum=5, maximum=120)),
+        "imap_append_timeout_seconds": str(_setting_int(request.form, "imap_append_timeout_seconds", 10, minimum=3, maximum=60)),
+        "smtp_transient_retries": str(_setting_int(request.form, "smtp_transient_retries", 2, minimum=0, maximum=5)),
+        "smtp_transient_retry_delay_seconds": str(_setting_int(request.form, "smtp_transient_retry_delay_seconds", 8, minimum=1, maximum=180)),
+        "imap_sync_sent": "true" if request.form.get("imap_sync_sent") == "on" else "false",
         "micro_test_size": str(_setting_int(request.form, "micro_test_size", 2, minimum=1, maximum=10)),
         "micro_test_enabled": "true" if request.form.get("micro_test_enabled") == "on" else "false",
         "pause_on_bounce": "true" if request.form.get("pause_on_bounce") == "on" else "false",

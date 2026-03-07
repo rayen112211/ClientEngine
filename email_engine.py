@@ -9,6 +9,7 @@ import random
 import re
 import time
 import imaplib
+import socket
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -53,6 +54,17 @@ HARD_BOUNCE_HINTS = (
     "invalid recipient",
 )
 
+TRANSIENT_SMTP_HINTS = (
+    "timed out",
+    "timeout",
+    "temporarily unavailable",
+    "service not available",
+    "connection unexpectedly closed",
+    "connection reset",
+    "network is unreachable",
+    "temporary failure",
+)
+
 
 def _smtp_error_text(exc):
     raw = getattr(exc, "smtp_error", None)
@@ -70,19 +82,26 @@ def _classify_smtp_data_error(exc):
     code = int(getattr(exc, "smtp_code", 0) or 0)
     text = _smtp_error_text(exc).lower()
 
-    if code in (421, 450, 451, 452):
-        return True, False
-
     if any(hint in text for hint in RATE_LIMIT_HINTS):
         return True, False
 
     if any(hint in text for hint in HARD_BOUNCE_HINTS):
         return False, True
 
+    if code in (421, 450, 451, 452):
+        # Temporary SMTP codes are not always provider quota limits.
+        # Keep them as soft failures unless the error text clearly indicates throttling.
+        return False, False
+
     if code in (550, 551, 553):
         return False, True
 
     return False, False
+
+
+def _is_transient_smtp_error_message(text):
+    lowered = (text or "").lower()
+    return any(hint in lowered for hint in TRANSIENT_SMTP_HINTS)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -205,7 +224,11 @@ def send_email(to_email, subject, body, settings):
     The rate_limited flag indicates the provider is throttling us (should pause & retry).
     """
     smtp_host = settings.get("smtp_host", "smtp.gmail.com")
-    smtp_port = int(settings.get("smtp_port", 465))
+    try:
+        smtp_port = int(settings.get("smtp_port", 465))
+    except Exception:
+        smtp_port = 465
+
     smtp_user = settings.get("smtp_user", "")
     smtp_password = settings.get("smtp_password", "")
     use_ssl = settings.get("smtp_use_ssl", "true").lower() == "true"
@@ -213,62 +236,72 @@ def send_email(to_email, subject, body, settings):
     from_email = settings.get("from_email", smtp_user)
     reply_to = settings.get("reply_to", from_email)
 
+    try:
+        smtp_timeout = max(5, min(120, int(settings.get("smtp_timeout_seconds", 20))))
+    except Exception:
+        smtp_timeout = 20
+    try:
+        imap_timeout = max(3, min(60, int(settings.get("imap_append_timeout_seconds", 10))))
+    except Exception:
+        imap_timeout = 10
+    sync_sent_folder = settings.get("imap_sync_sent", "true").lower() == "true"
+
     if not smtp_user or not smtp_password:
         return False, "SMTP credentials not configured", False, False
 
     if not to_email:
-        return False, "No recipient email", True, False  # Treat missing email as bounce
+        return False, "No recipient email", True, False
 
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"]    = f"{from_name} <{from_email}>"
-        msg["To"]      = to_email
-        msg["Reply-To"] = reply_to  # Ensures replies go to hello@rayenlazizi.tech
-
-        # Plain text for maximum deliverability
+        msg["From"] = f"{from_name} <{from_email}>"
+        msg["To"] = to_email
+        msg["Reply-To"] = reply_to
         msg.attach(MIMEText(body, "plain", "utf-8"))
 
         if use_ssl:
-            # SSL mode: port 465
             context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=20) as server:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=smtp_timeout) as server:
                 server.login(smtp_user, smtp_password)
                 server.send_message(msg)
         else:
-            # STARTTLS mode: port 587 (SpaceMail default)
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=smtp_timeout) as server:
                 server.ehlo()
                 server.starttls(context=ssl.create_default_context())
                 server.ehlo()
                 server.login(smtp_user, smtp_password)
                 server.send_message(msg)
-                
-        # Automatically append to the Sent folder via IMAP
-        try:
-            imap_host = smtp_host.replace("smtp", "imap")
-            if "spacemail" in smtp_host:
-                imap_host = "mail.spacemail.com" # SpaceMail uses the same host for IMAP
-            
-            with imaplib.IMAP4_SSL(imap_host, 993) as imap:
-                imap.login(smtp_user, smtp_password)
-                # Ensure the string is formatted exactly as standard RFC822
-                message_str = msg.as_string().encode('utf-8')
-                
-                # Check for standard sent folder names
-                for sent_folder in ['"Sent Items"', 'Sent', '"Sent Messages"', '"Sent"']:
-                    status, _ = imap.select(sent_folder)
-                    if status == 'OK':
-                        imap.append(sent_folder, '\\Seen', imaplib.Time2Internaldate(time.time()), message_str)
-                        break
-        except Exception as imap_err:
-            print(f"Warning: Could not save to Sent folder via IMAP: {imap_err}")
+
+        # Sent-folder sync must never block the pipeline forever.
+        if sync_sent_folder:
+            try:
+                imap_host = smtp_host.replace("smtp", "imap")
+                if "spacemail" in smtp_host:
+                    imap_host = "mail.spacemail.com"
+
+                try:
+                    imap = imaplib.IMAP4_SSL(imap_host, 993, timeout=imap_timeout)
+                except TypeError:
+                    # Older Python versions may not support timeout kwarg.
+                    imap = imaplib.IMAP4_SSL(imap_host, 993)
+
+                with imap:
+                    imap.login(smtp_user, smtp_password)
+                    message_str = msg.as_string().encode("utf-8")
+                    for sent_folder in ['"Sent Items"', 'Sent', '"Sent Messages"', '"Sent"']:
+                        status, _ = imap.select(sent_folder)
+                        if status == "OK":
+                            imap.append(sent_folder, "\\Seen", imaplib.Time2Internaldate(time.time()), message_str)
+                            break
+            except Exception as imap_err:
+                print(f"Warning: Could not save to Sent folder via IMAP: {imap_err}")
 
         return True, None, False, False
 
     except smtplib.SMTPAuthenticationError:
-        return False, "SMTP authentication failed — check username/password", False, False
-    except smtplib.SMTPRecipientsRefused as e:
+        return False, "SMTP authentication failed - check username/password", False, False
+    except smtplib.SMTPRecipientsRefused:
         return False, f"Recipient refused (bounced): {to_email}", True, False
     except smtplib.SMTPDataError as e:
         error_msg = _smtp_error_text(e)
@@ -277,17 +310,24 @@ def send_email(to_email, subject, body, settings):
             return False, f"Bounced (hard): {error_msg}", True, False
         if is_rate_limit:
             return False, f"Rate limit hit: {error_msg}", False, True
-        # Everything else = soft failure
+        if _is_transient_smtp_error_message(error_msg):
+            return False, f"Transient SMTP error: {error_msg}", False, False
         return False, f"Soft fail: {error_msg}", False, False
-
     except smtplib.SMTPSenderRefused:
-        return False, "Sender address rejected — check From Email", False, False
-    except Exception as e:
+        return False, "Sender address rejected - check From Email", False, False
+    except (socket.timeout, TimeoutError, smtplib.SMTPServerDisconnected, ssl.SSLError, ConnectionError) as e:
+        return False, f"Transient SMTP error: {e}", False, False
+    except OSError as e:
+        if _is_transient_smtp_error_message(str(e)):
+            return False, f"Transient SMTP error: {e}", False, False
         return False, str(e), False, False
+    except Exception as e:
+        err = str(e)
+        if _is_transient_smtp_error_message(err):
+            return False, f"Transient SMTP error: {err}", False, False
+        return False, err, False, False
 
 
-
-# ═══════════════════════════════════════════════════════════
 # PREVIEW
 # ═══════════════════════════════════════════════════════════
 

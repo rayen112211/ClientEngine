@@ -94,8 +94,34 @@
                         <input type="number" name="smtp_daily_limit" value="{{ settings.get('smtp_daily_limit', '2000') }}"
                             min="0" max="500000">
                     </div>
+                    <div class="form-group">
+                        <label>SMTP Timeout (seconds)</label>
+                        <input type="number" name="smtp_timeout_seconds" value="{{ settings.get('smtp_timeout_seconds', '20') }}"
+                            min="5" max="120">
+                    </div>
+                    <div class="form-group">
+                        <label>IMAP Sent-Save Timeout (seconds)</label>
+                        <input type="number" name="imap_append_timeout_seconds" value="{{ settings.get('imap_append_timeout_seconds', '10') }}"
+                            min="3" max="60">
+                    </div>
+                    <div class="form-group">
+                        <label>Transient Retry Attempts</label>
+                        <input type="number" name="smtp_transient_retries" value="{{ settings.get('smtp_transient_retries', '2') }}"
+                            min="0" max="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Transient Retry Base Delay (seconds)</label>
+                        <input type="number" name="smtp_transient_retry_delay_seconds" value="{{ settings.get('smtp_transient_retry_delay_seconds', '8') }}"
+                            min="1" max="180">
+                    </div>
                 </div>
                 <small class="form-hint">These limits are your local safety caps and are shown on the dashboard.</small>
+                <div class="form-group" style="margin-top:.5rem;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="imap_sync_sent" {{ 'checked' if settings.get('imap_sync_sent','true')=='true' }}>
+                        Save sent emails to IMAP Sent folder
+                    </label>
+                </div>
                 <div class="form-group" style="margin-top:.5rem;">
                     <label class="checkbox-label">
                         <input type="checkbox" name="micro_test_enabled" {{ 'checked' if
