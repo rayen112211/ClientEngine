@@ -379,7 +379,7 @@
                             'no_website': 'Search finished: no websites found to scrape.',
                             'timeout': 'Search timed out. Partial progress was saved.',
                             'done': 'Sending finished.',
-                            'paused': `Paused (rate limit). ${data.sent || 0} sent so far.`,
+                            'paused': `Paused (quota/rate limit). ${data.sent || 0} sent so far. Check dashboard capacity counters.`,
                         };
                         txt.textContent = labels[data.status] || 'Processing...';
 

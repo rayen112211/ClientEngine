@@ -104,7 +104,32 @@
             <span class="stat-label">Reply Rate</span>
         </div>
     </div>
+
+    <div class="stat-card stat-warning">
+        <div class="stat-icon">1h</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ send_capacity.hourly_sent if send_capacity else 0 }}/{{ send_capacity.hourly_limit if send_capacity else 0 }}</span>
+            <span class="stat-label">Sent Last Hour / Limit</span>
+        </div>
+    </div>
+    <div class="stat-card stat-primary">
+        <div class="stat-icon">24h</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ send_capacity.daily_sent if send_capacity else 0 }}/{{ send_capacity.daily_limit if send_capacity else 0 }}</span>
+            <span class="stat-label">Sent Last 24h / Limit</span>
+        </div>
+    </div>
 </div>
+
+{% if send_capacity %}
+<div class="card" style="margin-top: 1rem;">
+    <div class="card-body" style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
+        <span><strong>Hourly Remaining:</strong> {{ send_capacity.hourly_remaining }}</span>
+        <span><strong>Daily Remaining:</strong> {{ send_capacity.daily_remaining }}</span>
+        <span class="text-muted">Adjust limits in Settings -> Sending Controls.</span>
+    </div>
+</div>
+{% endif %}
 
 <!-- How It Works -->
 <div class="card">

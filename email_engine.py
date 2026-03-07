@@ -31,6 +31,60 @@ from database import (
 from templates_data import get_template
 
 
+RATE_LIMIT_HINTS = (
+    "too many messages",
+    "rate limit",
+    "rate exceeded",
+    "limit exceeded",
+    "quota",
+    "throttle",
+    "temporarily deferred",
+    "try again later",
+    "4.7.",
+    "4.2.",
+)
+
+HARD_BOUNCE_HINTS = (
+    "user unknown",
+    "unknown user",
+    "no such user",
+    "mailbox unavailable",
+    "recipient address rejected",
+    "invalid recipient",
+)
+
+
+def _smtp_error_text(exc):
+    raw = getattr(exc, "smtp_error", None)
+    if isinstance(raw, bytes):
+        return raw.decode("utf-8", errors="ignore")
+    if raw:
+        return str(raw)
+    return str(exc)
+
+
+def _classify_smtp_data_error(exc):
+    """
+    Return (is_rate_limited, is_hard_bounce) for SMTPDataError.
+    """
+    code = int(getattr(exc, "smtp_code", 0) or 0)
+    text = _smtp_error_text(exc).lower()
+
+    if code in (421, 450, 451, 452):
+        return True, False
+
+    if any(hint in text for hint in RATE_LIMIT_HINTS):
+        return True, False
+
+    if any(hint in text for hint in HARD_BOUNCE_HINTS):
+        return False, True
+
+    if code in (550, 551, 553):
+        return False, True
+
+    return False, False
+
+
 # ═══════════════════════════════════════════════════════════
 # PERSONALIZATION
 # ═══════════════════════════════════════════════════════════
@@ -217,16 +271,8 @@ def send_email(to_email, subject, body, settings):
     except smtplib.SMTPRecipientsRefused as e:
         return False, f"Recipient refused (bounced): {to_email}", True, False
     except smtplib.SMTPDataError as e:
-        error_msg = str(e)
-        # Rate-limit errors (554 5.7.1 "too many messages") are TEMPORARY — NOT a bounce
-        # Do not mark the recipient as bounced for rate limits
-        is_rate_limit = any(kw in error_msg.lower() for kw in [
-            "too many messages", "rate", "policy", "rejected", "spam"
-        ])
-        # Genuine hard bounces: user doesn't exist or domain doesn't accept mail
-        is_hard_bounce = (
-            ("550" in error_msg or "553" in error_msg) and not is_rate_limit
-        )
+        error_msg = _smtp_error_text(e)
+        is_rate_limit, is_hard_bounce = _classify_smtp_data_error(e)
         if is_hard_bounce:
             return False, f"Bounced (hard): {error_msg}", True, False
         if is_rate_limit:

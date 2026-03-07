@@ -256,6 +256,12 @@ def home():
     total_sent = conn.execute("SELECT COUNT(*) FROM email_log WHERE status='sent'").fetchone()[0]
     total_replied = conn.execute("SELECT COUNT(*) FROM email_log WHERE replied=1").fetchone()[0]
     reply_rate = round(total_replied / total_sent * 100, 1) if total_sent > 0 else 0
+    sent_last_hour = conn.execute(
+        "SELECT COUNT(*) FROM email_log WHERE status='sent' AND datetime(sent_at) >= datetime('now','-1 hour')"
+    ).fetchone()[0]
+    sent_last_day = conn.execute(
+        "SELECT COUNT(*) FROM email_log WHERE status='sent' AND datetime(sent_at) >= datetime('now','-1 day')"
+    ).fetchone()[0]
 
     # Pipeline runs (show last 20)
     runs = conn.execute(
@@ -267,12 +273,26 @@ def home():
         "SELECT COUNT(*) FROM pipeline_runs WHERE status IN ('ready','partial','timeout','paused')"
     ).fetchone()[0]
 
+    settings = get_settings()
+    hourly_limit = _setting_int(settings, "smtp_hourly_limit", 500, minimum=0, maximum=500000)
+    daily_limit = _setting_int(settings, "smtp_daily_limit", 2000, minimum=0, maximum=500000)
     history = get_search_history(limit=5)
     conn.close()
+
+    hourly_remaining = max(hourly_limit - sent_last_hour, 0) if hourly_limit > 0 else 0
+    daily_remaining = max(daily_limit - sent_last_day, 0) if daily_limit > 0 else 0
 
     return render_template(
         "home.html",
         stats={"sent": total_sent, "replies": total_replied, "rate": reply_rate},
+        send_capacity={
+            "hourly_limit": hourly_limit,
+            "hourly_sent": sent_last_hour,
+            "hourly_remaining": hourly_remaining,
+            "daily_limit": daily_limit,
+            "daily_sent": sent_last_day,
+            "daily_remaining": daily_remaining,
+        },
         runs=rows_to_dicts(runs) if runs else [],
         history=history,
         queue=get_queue_status(),
@@ -995,11 +1015,17 @@ def _do_send_pipeline(pipeline_id):
         sent_count = run["sent"] or 0
         fail_count = run["failed"] or 0
         bounce_count = run["bounced"] or 0
+        def _parse_int_setting(key, default, minimum=0, maximum=500000):
+            return _setting_int(settings, key, default, minimum=minimum, maximum=maximum)
 
-        delay_min = int(settings.get("send_delay_min", 30))
-        delay_max = int(settings.get("send_delay_max", 60))
+        delay_min = _parse_int_setting("send_delay_min", 30, minimum=5, maximum=600)
+        delay_max = _parse_int_setting("send_delay_max", 60, minimum=5, maximum=900)
+        if delay_max < delay_min:
+            delay_max = delay_min
+        hourly_limit = _parse_int_setting("smtp_hourly_limit", 500, minimum=0, maximum=500000)
+        daily_limit = _parse_int_setting("smtp_daily_limit", 2000, minimum=0, maximum=500000)
         micro_test_on = settings.get("micro_test_enabled", "true").lower() == "true"
-        micro_test_size = int(settings.get("micro_test_size", 2))
+        micro_test_size = _parse_int_setting("micro_test_size", 2, minimum=1, maximum=10)
         pause_on_bounce = settings.get("pause_on_bounce", "true").lower() == "true"
 
         micro_test_done = not micro_test_on
@@ -1022,10 +1048,37 @@ def _do_send_pipeline(pipeline_id):
                 )
                 conn.commit()
 
+        def _quota_usage():
+            with db_session() as conn:
+                hourly_sent = conn.execute(
+                    "SELECT COUNT(*) FROM email_log WHERE status='sent' AND datetime(sent_at) >= datetime('now','-1 hour')"
+                ).fetchone()[0]
+                daily_sent = conn.execute(
+                    "SELECT COUNT(*) FROM email_log WHERE status='sent' AND datetime(sent_at) >= datetime('now','-1 day')"
+                ).fetchone()[0]
+            return int(hourly_sent or 0), int(daily_sent or 0)
+
+        def _quota_blocked():
+            hourly_sent, daily_sent = _quota_usage()
+            if hourly_limit > 0 and hourly_sent >= hourly_limit:
+                return True, f"Hourly quota reached ({hourly_sent}/{hourly_limit})."
+            if daily_limit > 0 and daily_sent >= daily_limit:
+                return True, f"Daily quota reached ({daily_sent}/{daily_limit})."
+            return False, ""
+
         for i, biz in enumerate(qualified):
             if _abort_check():
                 _pipeline_log(pipeline_id, "send_stopped", f"aborted at lead {i + 1}")
                 break
+
+            quota_hit, quota_message = _quota_blocked()
+            if quota_hit:
+                _pipeline_log(pipeline_id, "send_paused", quota_message, level="warning")
+                _flush_counters()
+                with db_session() as conn:
+                    conn.execute("UPDATE pipeline_runs SET status=? WHERE id=?", (STATUS_PAUSED, pipeline_id))
+                    conn.commit()
+                return
 
             if not micro_test_done and micro_test_sent >= micro_test_size:
                 micro_test_done = True
@@ -1446,6 +1499,8 @@ def update_settings_route():
         "google_places_api_key": request.form.get("google_places_api_key", ""),
         "send_delay_min": str(send_delay_min),
         "send_delay_max": str(send_delay_max),
+        "smtp_hourly_limit": str(_setting_int(request.form, "smtp_hourly_limit", 500, minimum=0, maximum=500000)),
+        "smtp_daily_limit": str(_setting_int(request.form, "smtp_daily_limit", 2000, minimum=0, maximum=500000)),
         "micro_test_size": str(_setting_int(request.form, "micro_test_size", 2, minimum=1, maximum=10)),
         "micro_test_enabled": "true" if request.form.get("micro_test_enabled") == "on" else "false",
         "pause_on_bounce": "true" if request.form.get("pause_on_bounce") == "on" else "false",
