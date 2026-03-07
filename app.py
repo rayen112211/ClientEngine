@@ -1010,7 +1010,7 @@ def _do_send_pipeline(pipeline_id):
             try:
                 with db_session() as conn:
                     row = conn.execute("SELECT status FROM pipeline_runs WHERE id=?", (pipeline_id,)).fetchone()
-                    return row and normalize_status(row["status"]) in {STATUS_ERROR, STATUS_STOPPED, STATUS_PAUSED}
+                    return row and normalize_status(row["status"]) in {STATUS_ERROR, STATUS_STOPPED}
             except Exception:
                 return False
 
