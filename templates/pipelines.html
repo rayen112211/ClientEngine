@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-{% block title %}All Searches — ClientEngine{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}All Searches â€” ClientEngine{% endblock %}
 {% block content %}
 
 <div class="page-header">
@@ -35,14 +35,14 @@
                         <td>{{ r.found }}</td>
                         <td>{{ r.qualified }}</td>
                         <td>{{ r.sent }}</td>
-                        <td><span class="status-badge status-{{ r.status }}">{{ r.status }}</span></td>
+                        <td><span class="status-badge status-{{ r.status.replace('_', ' ') if r.status else '' }}">{{ r.status.replace('_', ' ') if r.status else '' }}</span></td>
                         <td>
                             <a href="/results/{{ r.id }}" class="btn btn-xs btn-outline">View</a>
                             {% if r.status == 'sending' %}
                             <form method="POST" action="/stop_pipeline/{{ r.id }}" style="display:inline;"
                                 onsubmit="return confirm('Force Stop this pipeline from sending any more emails?');">
                                 <button type="submit" class="btn btn-xs btn-outline"
-                                    style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;">🛑
+                                    style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;">ðŸ›‘
                                     Stop</button>
                             </form>
                             {% endif %}
@@ -50,7 +50,7 @@
                                 onsubmit="return confirm('Delete this pipeline run entirely?');">
                                 <button type="submit" class="btn btn-xs btn-outline"
                                     style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;"
-                                    title="Delete">🗑️</button>
+                                    title="Delete">ðŸ—‘ï¸</button>
                             </form>
                         </td>
                     </tr>

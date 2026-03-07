@@ -1,266 +1,262 @@
+﻿"""
+Business discovery across Google Places and optional social/directory sources.
 """
-Business Discovery Module.
-Find businesses using Google Places API or web search fallback.
-"""
-import requests
-import json
+from __future__ import annotations
+
 import time
-from config import GOOGLE_PLACES_API_KEY
+from typing import Dict, List
+
+import requests
+
+import config
 
 
-def search_google_places(query, location=None, max_results=60):
+GOOGLE_TEXTSEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+GOOGLE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
+
+
+def _request_json(url: str, *, params: dict, timeout: float, retries: int = 2) -> Dict:
+    last_error = ""
+    for attempt in range(retries + 1):
+        try:
+            resp = requests.get(url, params=params, timeout=timeout)
+            if resp.status_code >= 500:
+                last_error = f"http_{resp.status_code}"
+                time.sleep(min(2 ** attempt, 4))
+                continue
+            return resp.json()
+        except requests.exceptions.Timeout:
+            last_error = "timeout"
+        except requests.exceptions.RequestException as exc:
+            last_error = f"request_error:{exc}"
+
+        if attempt < retries:
+            time.sleep(min(2 ** attempt, 4))
+
+    return {"status": "REQUEST_FAILED", "error_message": last_error}
+
+
+def search_google_places(query: str, location: str | None = None, max_results: int = 60, api_key: str | None = None) -> Dict:
     """
-    Search for businesses using Google Places API Text Search.
-    Returns list of business dicts.
+    Query Google Places Text Search and normalize result rows.
     """
-    if not GOOGLE_PLACES_API_KEY:
+    key = (api_key or config.GOOGLE_PLACES_API_KEY or "").strip()
+    if not key:
         return {"error": "Google Places API key not configured. Add it in Settings.", "results": []}
 
-    all_results = []
-    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-
-    search_query = query
+    search_query = query.strip()
     if location:
-        search_query = f"{query} in {location}"
+        search_query = f"{query.strip()} in {location.strip()}"
 
-    params = {
-        "query": search_query,
-        "key": GOOGLE_PLACES_API_KEY,
-    }
+    params = {"query": search_query, "key": key}
+    data = _request_json(GOOGLE_TEXTSEARCH_URL, params=params, timeout=15)
 
-    try:
-        # First page
-        resp = requests.get(url, params=params, timeout=15)
-        data = resp.json()
+    status = data.get("status")
+    if status == "REQUEST_DENIED":
+        return {
+            "error": f"API Error: {data.get('error_message', 'Request denied')}",
+            "results": [],
+        }
+    if status not in {"OK", "ZERO_RESULTS"}:
+        return {"error": f"API Error: {status}", "results": []}
 
-        if data.get("status") == "REQUEST_DENIED":
-            return {"error": f"API Error: {data.get('error_message', 'Request denied')}", "results": []}
+    all_results = list(data.get("results", []))
 
-        if data.get("status") not in ("OK", "ZERO_RESULTS"):
-            return {"error": f"API Error: {data.get('status')}", "results": []}
+    pages = 1
+    next_page_token = data.get("next_page_token")
+    while next_page_token and len(all_results) < max_results and pages < 3:
+        token_ready = False
+        token_data = None
 
-        all_results.extend(data.get("results", []))
+        for _ in range(4):
+            time.sleep(2)
+            token_params = {"pagetoken": next_page_token, "key": key}
+            token_data = _request_json(GOOGLE_TEXTSEARCH_URL, params=token_params, timeout=15)
+            token_status = token_data.get("status")
+            if token_status == "INVALID_REQUEST":
+                continue
+            token_ready = True
+            break
 
-        # Get additional pages (up to 3 pages = ~60 results)
-        pages = 1
-        while data.get("next_page_token") and len(all_results) < max_results and pages < 3:
-            time.sleep(2)  # Google requires delay between page requests
-            params["pagetoken"] = data["next_page_token"]
-            if "query" in params:
-                del params["query"]
-            resp = requests.get(url, params=params, timeout=15)
-            data = resp.json()
-            all_results.extend(data.get("results", []))
-            pages += 1
+        if not token_ready:
+            break
 
-    except Exception as e:
-        return {"error": f"Request failed: {str(e)}", "results": []}
+        if token_data.get("status") not in {"OK", "ZERO_RESULTS"}:
+            break
 
-    # Get details for each place
+        all_results.extend(token_data.get("results", []))
+        next_page_token = token_data.get("next_page_token")
+        pages += 1
+
     businesses = []
     for place in all_results[:max_results]:
-        biz = {
-            "business_name": place.get("name", ""),
-            "address": place.get("formatted_address", ""),
-            "google_rating": place.get("rating", 0.0),
-            "review_count": place.get("user_ratings_total", 0),
-            "place_id": place.get("place_id", ""),
-            "types": place.get("types", []),
-            "source": "google_maps",
-            "city": location,
-            "website": "",
-            "phone": "",
-            "email": "",
-        }
-
-        # Extract clean city from address (Ignore Postcodes)
-        addr_parts = biz["address"].split(",")
+        address = place.get("formatted_address", "")
         city_name = ""
-        if len(addr_parts) >= 2:
-            # Usually the second to last part contains the city and postcode
-            raw_city_part = addr_parts[-2].strip()
-            # Remove any postcodes (numbers or mixed letters/numbers like 2QW)
-            # Also remove exactly 2-letter fully uppercase words (Italian province codes like RM, MI)
-            clean_words = []
-            for word in raw_city_part.split():
-                if any(char.isdigit() for char in word):
-                    continue
-                if len(word) == 2 and word.isupper():
-                    continue
-                clean_words.append(word)
-            city_name = " ".join(clean_words)
-        
-        biz["city"] = city_name
+        if address:
+            parts = [part.strip() for part in address.split(",") if part.strip()]
+            if len(parts) >= 2:
+                candidate = parts[-2]
+                cleaned = []
+                for token in candidate.split():
+                    if any(char.isdigit() for char in token):
+                        continue
+                    if len(token) == 2 and token.isupper():
+                        continue
+                    cleaned.append(token)
+                city_name = " ".join(cleaned).strip()
 
-        businesses.append(biz)
+        businesses.append(
+            {
+                "business_name": place.get("name", ""),
+                "address": address,
+                "google_rating": place.get("rating", 0.0),
+                "review_count": place.get("user_ratings_total", 0),
+                "place_id": place.get("place_id", ""),
+                "types": place.get("types", []),
+                "source": "google_maps",
+                "city": city_name or (location or ""),
+                "website": "",
+                "phone": "",
+                "email": "",
+                "category": query,
+            }
+        )
 
     return {"error": None, "results": businesses, "total": len(businesses)}
 
 
-def get_place_details(place_id):
-    """
-    Get detailed info for a specific place (website, phone, etc).
-    """
-    if not GOOGLE_PLACES_API_KEY:
+def get_place_details(place_id: str, api_key: str | None = None) -> Dict:
+    key = (api_key or config.GOOGLE_PLACES_API_KEY or "").strip()
+    if not key or not place_id:
         return {}
 
-    url = "https://maps.googleapis.com/maps/api/place/details/json"
     params = {
         "place_id": place_id,
         "fields": "name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,url,opening_hours,business_status",
-        "key": GOOGLE_PLACES_API_KEY,
+        "key": key,
     }
-
-    try:
-        resp = requests.get(url, params=params, timeout=10)
-        data = resp.json()
-
-        if data.get("status") != "OK":
-            return {}
-
-        result = data.get("result", {})
-        return {
-            "website": result.get("website", ""),
-            "phone": result.get("formatted_phone_number", ""),
-            "business_status": result.get("business_status", ""),
-        }
-    except Exception:
+    data = _request_json(GOOGLE_DETAILS_URL, params=params, timeout=12)
+    if data.get("status") != "OK":
         return {}
 
+    result = data.get("result", {})
+    return {
+        "website": result.get("website", ""),
+        "phone": result.get("formatted_phone_number", ""),
+        "business_status": result.get("business_status", ""),
+    }
 
-def enrich_with_details(businesses, max_detail_lookups=30):
-    """
-    Enrich a list of businesses with detailed info (website, phone).
-    Only does detail lookups for up to max_detail_lookups businesses to save API calls.
-    """
+
+def enrich_with_details(businesses: List[dict], max_detail_lookups: int = 30, api_key: str | None = None) -> List[dict]:
     enriched = []
     detail_count = 0
 
     for biz in businesses:
         if biz.get("place_id") and detail_count < max_detail_lookups:
-            details = get_place_details(biz["place_id"])
+            details = get_place_details(biz["place_id"], api_key=api_key)
             if details:
                 biz["website"] = details.get("website", biz.get("website", ""))
                 biz["phone"] = details.get("phone", biz.get("phone", ""))
             detail_count += 1
-            time.sleep(0.2)  # Rate limiting
+            time.sleep(0.15)
 
         enriched.append(biz)
 
     return enriched
 
 
-def search_businesses(business_type, location, source_choice="all", max_results=60):
+def search_businesses(business_type: str, location: str, source_choice: str = "all", max_results: int = 60) -> Dict:
     """
-    Main entry point: search for businesses across multiple sources and enrich with details.
-    source_choice can be 'all', 'google_maps', 'instagram', 'facebook', 'directories'.
+    Main entry for search pipeline.
     """
     businesses = []
     errors = []
-    
-    query = f"{business_type} {location}" if location else business_type
 
-    # 1. Google Maps
+    query = (business_type or "").strip()
+    location = (location or "").strip()
+
+    api_key = config.GOOGLE_PLACES_API_KEY
+    try:
+        from database import get_settings
+
+        settings = get_settings()
+        api_key = settings.get("google_places_api_key", api_key)
+    except Exception:
+        pass
+
     if source_choice in ("all", "google_maps"):
-        api_key = GOOGLE_PLACES_API_KEY
-        try:
-            from database import get_settings
-            settings = get_settings()
-            api_key = settings.get("google_places_api_key", api_key)
-        except Exception:
-            pass
-
-        if not api_key:
-            errors.append("Google Maps skipped: No API key.")
+        gm_res = search_google_places(query, location=location, max_results=max_results, api_key=api_key)
+        if gm_res.get("error"):
+            errors.append(f"Google Maps error: {gm_res['error']}")
         else:
-            import config
-            original_key = config.GOOGLE_PLACES_API_KEY
-            config.GOOGLE_PLACES_API_KEY = api_key
-            
-            gm_res = search_google_places(query, max_results=max_results)
-            if gm_res.get("error"):
-                errors.append(f"Google Maps error: {gm_res['error']}")
-            else:
-                businesses.extend(gm_res["results"])
-                
-            config.GOOGLE_PLACES_API_KEY = original_key
+            businesses.extend(gm_res.get("results", []))
 
-    # 2. Instagram
     if source_choice in ("all", "instagram"):
         try:
             from source_instagram import search_instagram
-            ig_res = search_instagram(business_type, location, max_results=20 if source_choice=="all" else max_results)
+
+            ig_res = search_instagram(query, location, max_results=20 if source_choice == "all" else max_results)
             if ig_res.get("error"):
                 errors.append(f"Instagram error: {ig_res['error']}")
             else:
-                businesses.extend(ig_res["results"])
-        except Exception as e:
-            errors.append(f"IG module error: {e}")
-            
-    # 3. Facebook
+                businesses.extend(ig_res.get("results", []))
+        except Exception as exc:
+            errors.append(f"Instagram module error: {exc}")
+
     if source_choice in ("all", "facebook"):
         try:
             from source_facebook import search_facebook
-            fb_res = search_facebook(business_type, location, max_results=20 if source_choice=="all" else max_results)
+
+            fb_res = search_facebook(query, location, max_results=20 if source_choice == "all" else max_results)
             if fb_res.get("error"):
                 errors.append(f"Facebook error: {fb_res['error']}")
             else:
-                businesses.extend(fb_res["results"])
-        except Exception as e:
-            errors.append(f"FB module error: {e}")
+                businesses.extend(fb_res.get("results", []))
+        except Exception as exc:
+            errors.append(f"Facebook module error: {exc}")
 
-    # 4. Directories (Yelp/YP)
     if source_choice in ("all", "directories"):
         try:
             from source_directories import search_directories
-            dir_res = search_directories(business_type, location, max_results=20 if source_choice=="all" else max_results)
+
+            dir_res = search_directories(query, location, max_results=20 if source_choice == "all" else max_results)
             if dir_res.get("error"):
                 errors.append(f"Directories error: {dir_res['error']}")
             else:
-                businesses.extend(dir_res["results"])
-        except Exception as e:
-            errors.append(f"Directories module error: {e}")
+                businesses.extend(dir_res.get("results", []))
+        except Exception as exc:
+            errors.append(f"Directories module error: {exc}")
 
-    # Deduplicate by business_name (fuzzy approach via lowercasing and standardizing spacing)
-    seen = {}
     deduped = []
-    
+    seen = {}
     for biz in businesses:
-        name_key = biz.get("business_name", "").lower().strip()
-        # Remove special chars for deduplication key
-        name_key = ''.join(e for e in name_key if e.isalnum())
-        
+        name_key = "".join(ch for ch in (biz.get("business_name", "").lower().strip()) if ch.isalnum())
+        city_key = (biz.get("city") or "").strip().lower()
+        key = f"{name_key}|{city_key}"
         if not name_key:
             continue
-            
-        if name_key not in seen:
-            seen[name_key] = biz
+
+        if key not in seen:
+            seen[key] = biz
             deduped.append(biz)
         else:
-            # Merge useful info from duplicates
-            existing = seen[name_key]
-            for field in ["instagram_url", "facebook_url", "whatsapp", "website", "phone"]:
+            existing = seen[key]
+            for field in ("instagram_url", "facebook_url", "whatsapp", "website", "phone", "email"):
                 if biz.get(field) and not existing.get(field):
                     existing[field] = biz[field]
 
-    # Google Maps results require detail lookups for website/phone
     gm_only = [b for b in deduped if b.get("source") == "google_maps"]
     non_gm = [b for b in deduped if b.get("source") != "google_maps"]
-    
     if gm_only:
-        enriched_gm = enrich_with_details(gm_only, max_detail_lookups=max_results)
-        deduped = enriched_gm + non_gm
+        deduped = enrich_with_details(gm_only, max_detail_lookups=max_results, api_key=api_key) + non_gm
 
     if not deduped and errors:
-        return {
-            "error": " | ".join(errors),
-            "results": [],
-            "total": 0,
-        }
+        return {"error": " | ".join(errors), "results": [], "total": 0, "debug_errors": errors}
 
+    limit = max_results if source_choice != "all" else max_results * 4
     return {
         "error": None,
-        "results": deduped[:max_results if source_choice != "all" else max_results*4],
+        "results": deduped[:limit],
         "total": len(deduped),
-        "debug_errors": errors
+        "debug_errors": errors,
     }

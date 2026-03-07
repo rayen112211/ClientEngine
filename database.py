@@ -27,12 +27,15 @@ from contextlib import contextmanager
 @contextmanager
 def db_session():
     """Context manager for safe database connections.
-    Ensures that connections are ALWAYS closed, even if an exception occurs inside the block.
-    This prevents SQLite database locks in multi-threaded environments.
+    Always closes the connection and rolls back on exceptions
+    to avoid long-lived SQLite write locks.
     """
     conn = get_db()
     try:
         yield conn
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -184,7 +187,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             query TEXT NOT NULL,
             location TEXT,
-            status TEXT DEFAULT 'running',
+            status TEXT DEFAULT 'pending',
             found INTEGER DEFAULT 0,
             with_website INTEGER DEFAULT 0,
             with_email INTEGER DEFAULT 0,
@@ -267,7 +270,7 @@ def init_db():
     # Any in-progress status means the server died mid-run — mark them error
     cursor.execute("""
         UPDATE pipeline_runs SET status='error'
-        WHERE status IN ('sending', 'running', 'searching', 'discovering', 'extracting', 'scoring', 'filtering')
+        WHERE status IN ('sending', 'running', 'pending', 'searching', 'discovering', 'extracting', 'scoring', 'filtering')
     """)
 
     # Ensure default campaign (ID=0) exists for pipeline direct-sends
@@ -287,6 +290,13 @@ def init_db():
         "from_email": "",
         "portfolio_link": "https://rayenlazizi.tech",
         "google_places_api_key": "",
+        "search_timeout_seconds": "900",
+        "discovery_timeout_seconds": "180",
+        "lead_timeout_seconds": "45",
+        "lead_fetch_connect_timeout_seconds": "4",
+        "lead_fetch_read_timeout_seconds": "7",
+        "search_max_results": "80",
+        "search_debug": "false",
     }
     for key, value in defaults.items():
         cursor.execute(
@@ -1135,20 +1145,26 @@ def enqueue_searches(queries, source_choice="all"):
 
 def dequeue_next_search():
     """Get and atomically lock the next pending queue item. Returns dict or None."""
-    conn = get_db()
-    row = conn.execute(
-        "SELECT * FROM search_queue WHERE status='pending' ORDER BY id ASC LIMIT 1"
-    ).fetchone()
-    if not row:
-        conn.close()
-        return None
-    conn.execute(
-        "UPDATE search_queue SET status='running', started_at=? WHERE id=?",
-        (datetime.utcnow().isoformat(), row["id"])
-    )
-    conn.commit()
-    conn.close()
-    return dict(row)
+    with db_session() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT * FROM search_queue WHERE status='pending' ORDER BY id ASC LIMIT 1"
+        ).fetchone()
+        if not row:
+            conn.commit()
+            return None
+
+        updated = conn.execute(
+            "UPDATE search_queue SET status='running', started_at=? WHERE id=? AND status='pending'",
+            (datetime.utcnow().isoformat(), row["id"]),
+        )
+        conn.commit()
+
+        if updated.rowcount == 0:
+            return None
+
+        row = conn.execute("SELECT * FROM search_queue WHERE id=?", (row["id"],)).fetchone()
+        return dict(row) if row else None
 
 
 def complete_queue_item(queue_id, pipeline_id, error=False):

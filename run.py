@@ -31,14 +31,14 @@ def cleanup_zombies():
         if os.path.exists(db_path):
             conn = sqlite3.connect(db_path)
             # Reset pipeline runs that were stuck in progress
-            stuck_states = ("discovering", "searching", "extracting", "scoring", "filtering")
+            stuck_states = ("pending", "discovering", "searching", "extracting", "scoring")
             placeholders = ",".join(["?"] * len(stuck_states))
             conn.execute(
                 f"UPDATE pipeline_runs SET status='failed' WHERE status IN ({placeholders})",
                 stuck_states
             )
             # Reset search queue
-            conn.execute("UPDATE search_queue SET status='pending' WHERE status='processing'")
+            conn.execute("UPDATE search_queue SET status='pending' WHERE status='running'")
             conn.commit()
             conn.close()
             print("✅ Database states reset to clean slate.")

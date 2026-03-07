@@ -61,6 +61,15 @@ SECRET_KEY = os.getenv("SECRET_KEY", "cold-email-system-secret-key-change-me")
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
 PORT = int(os.getenv("PORT", "5000"))
 
+# ----- Pipeline Debug / Timeouts -----
+PIPELINE_DEBUG = os.getenv("PIPELINE_DEBUG", "false").lower() == "true"
+SEARCH_TIMEOUT_SECONDS = int(os.getenv("SEARCH_TIMEOUT_SECONDS", "900"))
+DISCOVERY_TIMEOUT_SECONDS = int(os.getenv("DISCOVERY_TIMEOUT_SECONDS", "180"))
+LEAD_TIMEOUT_SECONDS = int(os.getenv("LEAD_TIMEOUT_SECONDS", "45"))
+LEAD_FETCH_CONNECT_TIMEOUT_SECONDS = float(os.getenv("LEAD_FETCH_CONNECT_TIMEOUT_SECONDS", "4"))
+LEAD_FETCH_READ_TIMEOUT_SECONDS = float(os.getenv("LEAD_FETCH_READ_TIMEOUT_SECONDS", "7"))
+SEARCH_MAX_RESULTS = int(os.getenv("SEARCH_MAX_RESULTS", "80"))
+
 # ----- Business Types -----
 BUSINESS_TYPES = {
     "restaurant": {

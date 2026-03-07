@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Results — ClientEngine{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}Results â€” ClientEngine{% endblock %}
 {% block content %}
 
 <div class="page-header">
@@ -10,53 +10,62 @@
 <!-- Pipeline Progress -->
 <div class="pipeline-progress" id="pipelineProgress">
     <div
-        class="pipeline-step {% if run.status in ('searching','discovering','extracting','scoring','filtering','ready','sending','sent') %}done{% endif %}">
-        <div class="ps-icon">🔍</div>
+        class="pipeline-step {% if run.status in ('pending','discovering','extracting','scoring','ready','partial','timeout','no_emails','no_website','sending','done','error','failed','paused') %}done{% endif %}">
+        <div class="ps-icon">ðŸ”</div>
         <div class="ps-label">Found</div>
-        <div class="ps-value" id="count-found">{{ run.found }}</div>
+        <div class="ps-value" id="count-found">{{ metrics.found if metrics else run.found }}</div>
     </div>
     <div class="pipeline-connector"></div>
     <div
-        class="pipeline-step {% if run.status in ('extracting','scoring','filtering','ready','sending','sent') %}done{% endif %}">
-        <div class="ps-icon">🌐</div>
+        class="pipeline-step {% if run.status in ('extracting','scoring','ready','partial','timeout','no_emails','no_website','sending','done','error','failed','paused') %}done{% endif %}">
+        <div class="ps-icon">ðŸŒ</div>
         <div class="ps-label">With Website</div>
-        <div class="ps-value" id="count-website">{{ run.with_website }}</div>
+        <div class="ps-value" id="count-website">{{ metrics.with_website if metrics else run.with_website }}</div>
     </div>
     <div class="pipeline-connector"></div>
-    <div class="pipeline-step {% if run.status in ('scoring','filtering','ready','sending','sent') %}done{% endif %}">
-        <div class="ps-icon">📧</div>
+    <div class="pipeline-step {% if run.status in ('scoring','ready','partial','timeout','no_emails','no_website','sending','done','error','failed','paused') %}done{% endif %}">
+        <div class="ps-icon">ðŸ“§</div>
         <div class="ps-label">Emails Found</div>
-        <div class="ps-value" id="count-email">{{ run.with_email }}</div>
+        <div class="ps-value" id="count-email">{{ metrics.with_email if metrics else run.with_email }}</div>
     </div>
     <div class="pipeline-connector"></div>
-    <div class="pipeline-step {% if run.status in ('ready','sending','sent') %}done{% endif %} highlight">
-        <div class="ps-icon">✅</div>
+    <div class="pipeline-step {% if run.status in ('ready','partial','timeout','no_emails','no_website','sending','done','error','failed','paused') %}done{% endif %} highlight">
+        <div class="ps-icon">âœ…</div>
         <div class="ps-label">Qualified</div>
-        <div class="ps-value" id="count-qualified">{{ run.qualified }}</div>
+        <div class="ps-value" id="count-qualified">{{ metrics.qualified if metrics else run.qualified }}</div>
     </div>
     {% if run.sent > 0 %}
     <div class="pipeline-connector"></div>
     <div class="pipeline-step done">
-        <div class="ps-icon">🚀</div>
+        <div class="ps-icon">ðŸš€</div>
         <div class="ps-label">Sent</div>
         <div class="ps-value">{{ run.sent }}</div>
     </div>
     {% endif %}
 </div>
 
+<div class="card" style="margin-top: 1rem;">
+    <div class="card-body" style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
+        <span><strong>Found:</strong> {{ metrics.found if metrics else 0 }}</span>
+        <span><strong>With Website:</strong> {{ metrics.with_website if metrics else 0 }}</span>
+        <span><strong>Emails:</strong> {{ metrics.with_email if metrics else 0 }}</span>
+        <span><strong>Qualified:</strong> {{ metrics.qualified if metrics else 0 }}</span>
+        <span><strong>Failed Leads:</strong> {{ metrics.failed_leads if metrics else 0 }}</span>
+        <span><strong>Skipped Leads:</strong> {{ metrics.skipped_leads if metrics else 0 }}</span>
+    </div>
+</div>
+
 <!-- Status Banner -->
-{% if run.status not in ('ready', 'sent', 'error', 'failed') %}
+{% if run.status not in ('ready', 'partial', 'no_emails', 'no_website', 'timeout', 'done', 'error', 'failed', 'paused') %}
 <div class="status-banner processing" id="statusBanner">
     <div class="spinner"></div>
     <span id="statusText">
-        {% if run.status == 'searching' or run.status == 'discovering' %}
+        {% if run.status in ('pending', 'searching', 'discovering') %}
         Searching for businesses...
         {% elif run.status == 'extracting' %}
         Extracting emails from websites...
         {% elif run.status == 'scoring' %}
-        Scoring businesses...
-        {% elif run.status == 'filtering' %}
-        Filtering quality businesses...
+        Scoring and qualifying businesses...
         {% elif run.status == 'sending' %}
         Sending emails... Check Analytics for live progress.
         {% else %}
@@ -71,47 +80,64 @@
 {% endif %}
 
 <!-- Actions -->
-{% if run.status == 'ready' and qualified %}
+{% if run.status in ('ready', 'partial', 'timeout', 'no_emails', 'no_website', 'error', 'failed') and qualified %}
 <div class="actions-bar">
     <form method="POST" action="/send/{{ pipeline_id }}">
         <button type="submit" class="btn btn-accent btn-lg">
-            🚀 Send {{ qualified|length }} Emails Now
+            Send {{ qualified|length }} Emails Now
         </button>
     </form>
-    <a href="/" class="btn btn-outline">← New Search</a>
+    <a href="/" class="btn btn-outline">New Search</a>
 </div>
-{% elif run.status in ('error', 'failed') %}
+{% elif run.status in ('error', 'failed', 'partial', 'timeout') and not qualified %}
 <div class="alert alert-error" style="margin-bottom: 1rem;">
-    {% if error %}{{ error }}{% else %}Search failed or was stopped.{% endif %}
+    {% if error %}{{ error }}{% else %}Search finished with errors and no sendable leads.{% endif %}
+</div>
+<div class="actions-bar">
+    <a href="/" class="btn btn-outline">Try Different Search</a>
+</div>
+{% elif run.status == 'done' %}
+<div class="actions-bar">
+    <a href="/analytics" class="btn btn-primary">View Analytics</a>
+    <a href="/" class="btn btn-outline">New Search</a>
+</div>
+{% elif run.status in ('ready', 'partial', 'no_emails', 'no_website', 'timeout') and not qualified %}
+<div class="actions-bar">
+    <div class="alert alert-warning" style="margin:0;">
+        No qualified businesses yet. Review skipped reasons below for quick diagnosis.
+    </div>
+    <a href="/" class="btn btn-outline">Try Different Search</a>
+</div>
+{% endif %}
 </div>
 <div class="actions-bar">
     <form method="POST" action="/send/{{ pipeline_id }}">
         <button type="submit" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">
-            🔄 Resume Sending ({{ qualified|length }})
+            ðŸ”„ Resume Sending ({{ qualified|length }})
         </button>
     </form>
-    <a href="/" class="btn btn-outline">← New Search</a>
+    <a href="/" class="btn btn-outline">â† New Search</a>
 </div>
-{% elif run.status == 'sent' %}
+{% elif run.status == 'done' %}
 <div class="actions-bar">
-    <a href="/analytics" class="btn btn-primary">📊 View Analytics</a>
-    <a href="/" class="btn btn-outline">← New Search</a>
+    <a href="/analytics" class="btn btn-primary">ðŸ“Š View Analytics</a>
+    <a href="/" class="btn btn-outline">â† New Search</a>
 </div>
-{% elif run.status in ('ready',) and not qualified %}
+{% elif run.status in ('ready', 'partial', 'no_emails', 'no_website', 'timeout') and not qualified %}
 <div class="actions-bar">
-    <a href="/" class="btn btn-outline">← Try Different Search</a>
+    <a href="/" class="btn btn-outline">â† Try Different Search</a>
 </div>
 {% endif %}
 
 <!-- Qualified Businesses (Email Previews) -->
 {% if qualified %}
-<h2 style="margin: 2rem 0 1rem">📧 Emails Ready to Send ({{ qualified|length }})</h2>
+<h2 style="margin: 2rem 0 1rem">ðŸ“§ Emails Ready to Send ({{ qualified|length }})</h2>
 {% for biz in qualified %}
 <div class="card email-card">
     <div class="card-header">
         <div style="display:flex;align-items:center;gap:0.75rem">
             <strong>{{ biz.business_name }}</strong>
-            <span class="text-muted">→ {{ biz.email }}</span>
+            <span class="text-muted">â†’ {{ biz.email }}</span>
         </div>
         <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
             {% if biz.dispatch_status == 'sent' %}
@@ -127,48 +153,48 @@
             <!-- Source Badge -->
             {% if biz.source == 'google_maps' %}
             <span class="status-badge"
-                style="background: rgba(66, 133, 244, 0.1); color: #4285F4; border-color: rgba(66, 133, 244, 0.2);">📍
+                style="background: rgba(66, 133, 244, 0.1); color: #4285F4; border-color: rgba(66, 133, 244, 0.2);">ðŸ“
                 Maps</span>
             {% elif biz.source == 'instagram' %}
             <span class="status-badge"
-                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">📸
+                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">ðŸ“¸
                 Instagram</span>
             {% elif biz.source == 'facebook' %}
             <span class="status-badge"
-                style="background: rgba(24, 119, 242, 0.1); color: #1877F2; border-color: rgba(24, 119, 242, 0.2);">📘
+                style="background: rgba(24, 119, 242, 0.1); color: #1877F2; border-color: rgba(24, 119, 242, 0.2);">ðŸ“˜
                 Facebook</span>
             {% elif biz.source == 'directories' %}
             <span class="status-badge"
-                style="background: rgba(211, 35, 35, 0.1); color: #d32323; border-color: rgba(211, 35, 35, 0.2);">📋
+                style="background: rgba(211, 35, 35, 0.1); color: #d32323; border-color: rgba(211, 35, 35, 0.2);">ðŸ“‹
                 Yelp</span>
             {% endif %}
 
             <!-- Tier Badge -->
             {% if biz.tier == 1 %}
             <span class="status-badge"
-                style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">🔥
+                style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">ðŸ”¥
                 Tier 1</span>
             {% elif biz.tier == 2 %}
             <span class="status-badge"
-                style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);">⚡
+                style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);">âš¡
                 Tier 2</span>
             {% else %}
             <span class="status-badge"
-                style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.3);">❄️
+                style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.3);">â„ï¸
                 Tier 3</span>
             {% endif %}
 
             <!-- Channel Badge -->
             {% if biz.outreach_channel == 'instagram_dm' %}
             <span class="status-badge"
-                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">📸
+                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">ðŸ“¸
                 IG DM</span>
             {% elif biz.outreach_channel == 'whatsapp' %}
             <span class="status-badge"
-                style="background: rgba(37, 211, 102, 0.1); color: #25D366; border-color: rgba(37, 211, 102, 0.2);">💬
+                style="background: rgba(37, 211, 102, 0.1); color: #25D366; border-color: rgba(37, 211, 102, 0.2);">ðŸ’¬
                 WhatsApp</span>
             {% else %}
-            <span class="status-badge status-active">📧 Email</span>
+            <span class="status-badge status-active">ðŸ“§ Email</span>
             {% endif %}
 
             <span
@@ -190,10 +216,10 @@
         </div>
         {% endif %}
         <div class="email-meta">
-            {% if biz.google_rating %}<span>⭐ {{ biz.google_rating }}</span>{% endif %}
-            {% if biz.review_count %}<span>📊 {{ biz.review_count }} reviews</span>{% endif %}
-            {% if biz.city %}<span>📍 {{ biz.city }}</span>{% endif %}
-            {% if biz.pain_points %}<span class="pain-tag">🎯 {{ biz.pain_points|join(', ') }}</span>{% endif %}
+            {% if biz.google_rating %}<span>â­ {{ biz.google_rating }}</span>{% endif %}
+            {% if biz.review_count %}<span>ðŸ“Š {{ biz.review_count }} reviews</span>{% endif %}
+            {% if biz.city %}<span>ðŸ“ {{ biz.city }}</span>{% endif %}
+            {% if biz.pain_points %}<span class="pain-tag">ðŸŽ¯ {{ biz.pain_points|join(', ') }}</span>{% endif %}
         </div>
         {% if biz.email_subject %}
         <div class="email-preview-block" id="preview-{{ loop.index }}">
@@ -201,18 +227,18 @@
                     }}</span></div>
             <pre class="email-preview" id="body-text-{{ loop.index }}">{{ biz.email_body }}</pre>
 
-            {% if run.status in ('ready', 'error', 'failed') and biz.dispatch_status not in ('sent', 'failed',
+            {% if run.status in ('ready', 'partial', 'timeout', 'no_emails', 'error', 'failed') and biz.dispatch_status not in ('sent', 'failed',
             'bounced',
             'skipped') %}
             <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
                 <button type="button" class="btn btn-sm btn-outline" onclick="toggleEdit({{ loop.index }})"
                     style="font-size: 0.85rem;">
-                    ✏️ Edit Email
+                    âœï¸ Edit Email
                 </button>
                 <button type="button" class="btn btn-sm btn-outline"
                     onclick="skipEmail('{{ biz.email }}', {{ loop.index }})"
                     style="font-size: 0.85rem; border-color: #e74c3c; color: #e74c3c;">
-                    🗑️ Remove from Queue
+                    ðŸ—‘ï¸ Remove from Queue
                 </button>
             </div>
             {% endif %}
@@ -234,7 +260,7 @@
                 <button type="button" class="btn btn-sm btn-outline"
                     onclick="toggleEdit({{ loop.index }})">Cancel</button>
                 <button type="button" class="btn btn-sm btn-primary"
-                    onclick="saveEmail('{{ biz.email }}', {{ loop.index }}, this)">💾 Save Changes</button>
+                    onclick="saveEmail('{{ biz.email }}', {{ loop.index }}, this)">ðŸ’¾ Save Changes</button>
             </div>
         </div>
         {% endif %}
@@ -247,7 +273,7 @@
 {% if skipped %}
 <details style="margin-top:2rem">
     <summary class="text-muted" style="cursor:pointer;margin-bottom:1rem">
-        ⏭️ Skipped businesses ({{ skipped|length }}) — click to show
+        â­ï¸ Skipped businesses ({{ skipped|length }}) â€” click to show
     </summary>
     <div class="card">
         <div class="card-body no-padding">
@@ -264,7 +290,7 @@
                         {% for biz in skipped %}
                         <tr class="row-dimmed">
                             <td>{{ biz.business_name }}</td>
-                            <td>{{ biz.score or '—' }}</td>
+                            <td>{{ biz.score or 'â€”' }}</td>
                             <td class="text-muted">{{ biz.skip_reason or 'Low score' }}</td>
                         </tr>
                         {% endfor %}
@@ -293,7 +319,7 @@
         });
 
         if (res.ok) {
-            card.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-weight: 500;">🗑️ Email to ${email} removed from the queue.</div>`;
+            card.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-weight: 500;">ðŸ—‘ï¸ Email to ${email} removed from the queue.</div>`;
         } else {
             alert('Failed to skip email');
             card.style.opacity = '1';
@@ -338,25 +364,30 @@
     }
 </script>
 
-{% if run.status not in ('ready', 'sent', 'error', 'done', 'paused') %}
+{% if run.status not in ('ready', 'partial', 'no_emails', 'no_website', 'timeout', 'done', 'error', 'failed', 'paused') %}
 <script>
     (function poll() {
         fetch('/api/pipeline/{{ pipeline_id }}')
             .then(r => r.json())
             .then(data => {
-                if (data.status === 'ready' || data.status === 'sent' || data.status === 'error' || data.status === 'done' || data.status === 'paused') {
+                if (['ready','partial','no_emails','no_website','timeout','done','error','failed','paused'].includes((data.status || '').toLowerCase())) {
                     location.reload();
                 } else {
                     const txt = document.getElementById('statusText');
                     if (txt) {
                         const labels = {
+                            'pending': 'Queued and waiting to start...',
                             'discovering': 'Searching for businesses...',
                             'searching': 'Searching for businesses...',
                             'extracting': `Extracting emails... (${data.with_email || 0} found)`,
-                            'scoring': 'Scoring businesses...',
-                            'filtering': 'Filtering quality businesses...',
+                            'scoring': 'Scoring and qualifying leads...',
                             'sending': `Sending emails... (${data.sent || 0} sent)`,
-                            'paused': `⏸ Paused (rate limit) — will auto-resume. ${data.sent || 0} sent so far.`,
+                            'partial': `Completed with partial results (${data.with_email || 0} emails found).`,
+                            'no_emails': 'Search finished: no usable emails found.',
+                            'no_website': 'Search finished: no websites found to scrape.',
+                            'timeout': 'Search timed out. Partial progress was saved.',
+                            'done': 'Sending finished.',
+                            'paused': `Paused (rate limit). ${data.sent || 0} sent so far.`,
                         };
                         txt.textContent = labels[data.status] || 'Processing...';
 

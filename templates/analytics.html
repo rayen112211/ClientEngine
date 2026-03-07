@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Analytics — ClientEngine{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}Analytics â€” ClientEngine{% endblock %}
 {% block content %}
 
 <div class="page-header">
@@ -10,28 +10,28 @@
 <!-- Stats -->
 <div class="stats-grid">
     <div class="stat-card stat-primary">
-        <div class="stat-icon">📨</div>
+        <div class="stat-icon">ðŸ“¨</div>
         <div class="stat-info">
             <span class="stat-value">{{ stats.sent }}</span>
             <span class="stat-label">Emails Sent</span>
         </div>
     </div>
     <div class="stat-card stat-success">
-        <div class="stat-icon">💬</div>
+        <div class="stat-icon">ðŸ’¬</div>
         <div class="stat-info">
             <span class="stat-value">{{ stats.replies }}</span>
             <span class="stat-label">Replies</span>
         </div>
     </div>
     <div class="stat-card stat-accent">
-        <div class="stat-icon">📈</div>
+        <div class="stat-icon">ðŸ“ˆ</div>
         <div class="stat-info">
             <span class="stat-value">{{ stats.rate }}%</span>
             <span class="stat-label">Reply Rate</span>
         </div>
     </div>
     <div class="stat-card stat-warning">
-        <div class="stat-icon">⚠️</div>
+        <div class="stat-icon">âš ï¸</div>
         <div class="stat-info">
             <span class="stat-value">{{ stats.bounced }}</span>
             <span class="stat-label">Bounced</span>
@@ -61,10 +61,10 @@
                     <li
                         style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
                         <span style="display: flex; align-items: center; gap: 0.5rem;">
-                            {% if src.source == 'google_maps' %}📍 Maps
-                            {% elif src.source == 'instagram' %}📸 Instagram
-                            {% elif src.source == 'facebook' %}📘 Facebook
-                            {% elif src.source == 'directories' %}📋 Yelp
+                            {% if src.source == 'google_maps' %}ðŸ“ Maps
+                            {% elif src.source == 'instagram' %}ðŸ“¸ Instagram
+                            {% elif src.source == 'facebook' %}ðŸ“˜ Facebook
+                            {% elif src.source == 'directories' %}ðŸ“‹ Yelp
                             {% else %}{{ src.source }}{% endif %}
                         </span>
                         <strong
@@ -88,9 +88,9 @@
                     <li
                         style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
                         <span style="display: flex; align-items: center; gap: 0.5rem;">
-                            {% if t.tier == 1 %}🔥 Tier 1 (Hot)
-                            {% elif t.tier == 2 %}⚡ Tier 2 (Warm)
-                            {% else %}❄️ Tier 3 (Cold)
+                            {% if t.tier == 1 %}ðŸ”¥ Tier 1 (Hot)
+                            {% elif t.tier == 2 %}âš¡ Tier 2 (Warm)
+                            {% else %}â„ï¸ Tier 3 (Cold)
                             {% endif %}
                         </span>
                         <strong
@@ -114,9 +114,9 @@
                     <li
                         style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
                         <span style="display: flex; align-items: center; gap: 0.5rem;">
-                            {% if ch.outreach_channel == 'instagram_dm' %}📸 IG DM
-                            {% elif ch.outreach_channel == 'whatsapp' %}💬 WhatsApp
-                            {% else %}📧 Cold Email
+                            {% if ch.outreach_channel == 'instagram_dm' %}ðŸ“¸ IG DM
+                            {% elif ch.outreach_channel == 'whatsapp' %}ðŸ’¬ WhatsApp
+                            {% else %}ðŸ“§ Cold Email
                             {% endif %}
                         </span>
                         <strong
@@ -163,14 +163,14 @@
                         <td>{{ r.qualified }}</td>
                         <td>{{ r.sent }}</td>
                         <td>{{ r.bounced }}</td>
-                        <td><span class="status-badge status-{{ r.status }}">{{ r.status }}</span></td>
+                        <td><span class="status-badge status-{{ r.status.replace('_', ' ') if r.status else '' }}">{{ r.status.replace('_', ' ') if r.status else '' }}</span></td>
                         <td>
                             <a href="/results/{{ r.id }}" class="btn btn-xs btn-outline">View</a>
                             {% if r.status == 'sending' %}
                             <form method="POST" action="/stop_pipeline/{{ r.id }}" style="display:inline;"
                                 onsubmit="return confirm('Force Stop this pipeline from sending any more emails?');">
                                 <button type="submit" class="btn btn-xs btn-outline"
-                                    style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;">🛑
+                                    style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;">ðŸ›‘
                                     Stop</button>
                             </form>
                             {% endif %}
@@ -178,7 +178,7 @@
                                 onsubmit="return confirm('Delete this pipeline run entirely?');">
                                 <button type="submit" class="btn btn-xs btn-outline"
                                     style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;"
-                                    title="Delete">🗑️</button>
+                                    title="Delete">ðŸ—‘ï¸</button>
                             </form>
                         </td>
                     </tr>
@@ -212,13 +212,13 @@
                     {% for log in logs %}
                     <tr>
                         <td class="text-muted nowrap">{{ log.sent_at[:16] if log.sent_at else '' }}</td>
-                        <td><strong>{{ log.business_name or '—' }}</strong><br>
+                        <td><strong>{{ log.business_name or 'â€”' }}</strong><br>
                             <span class="text-muted">{{ log.lead_email or '' }}</span>
                         </td>
                         <td class="truncate">{{ log.subject or '' }}</td>
                         <td>
                             {% if log.replied %}
-                            <span class="status-badge status-replied">Replied ✓</span>
+                            <span class="status-badge status-replied">Replied âœ“</span>
                             {% elif log.status == 'sent' %}
                             <span class="status-badge status-sent">Sent</span>
                             {% elif log.status == 'bounced' %}
@@ -230,7 +230,7 @@
                         <td>
                             {% if log.status == 'sent' and not log.replied %}
                             <form method="POST" action="/log/{{ log.id }}/replied" style="display:inline">
-                                <button type="submit" class="btn btn-xs btn-success">✓ Got Reply</button>
+                                <button type="submit" class="btn btn-xs btn-success">âœ“ Got Reply</button>
                             </form>
                             {% endif %}
                         </td>

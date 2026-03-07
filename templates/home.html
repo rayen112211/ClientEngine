@@ -1,38 +1,38 @@
-{% extends "base.html" %}
-{% block title %}ClientEngine — Cold Email Automation{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}ClientEngine â€” Cold Email Automation{% endblock %}
 {% block content %}
 
 <!-- Hero Search -->
 <div class="hero-search">
     <h1 class="hero-title">Find clients. Send emails. Get replies.</h1>
-    <p class="hero-subtitle">Type one search or paste a whole list — we handle everything else.</p>
+    <p class="hero-subtitle">Type one search or paste a whole list â€” we handle everything else.</p>
 
     <form method="POST" action="/search" class="search-form">
         <div class="search-box" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
             <textarea name="query" class="search-input" id="searchTextarea"
-                placeholder='Single:   "Restaurant Barcelona"&#10;&#10;Batch (one per line):&#10;Beauty Salon – Bend, OR&#10;Café – Medford, OR&#10;Gym – Eugene, OR'
+                placeholder='Single:   "Restaurant Barcelona"&#10;&#10;Batch (one per line):&#10;Beauty Salon â€“ Bend, OR&#10;CafÃ© â€“ Medford, OR&#10;Gym â€“ Eugene, OR'
                 rows="3" required autofocus autocomplete="off"
                 style="resize: vertical; min-height: 52px; font-family: inherit; font-size: 1rem; padding: 0.85rem 1.25rem; line-height: 1.5; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); outline: none; background: rgba(255,255,255,0.05); color: #e2e8f0;"
                 oninput="autoGrow(this)"></textarea>
 
             <select name="source" class="search-input"
                 style="padding: 0.85rem 1.25rem; border-radius: 12px; background: rgba(255,255,255,0.08); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; font-size: 0.95rem; font-family: inherit; outline: none;">
-                <option value="all" style="background: #1e293b;">🌍 All Sources (Max Leads)</option>
-                <option value="google_maps" style="background: #1e293b;">📍 Google Maps Only</option>
-                <option value="instagram" style="background: #1e293b;">📸 Instagram Only</option>
-                <option value="facebook" style="background: #1e293b;">📘 Facebook Only</option>
-                <option value="directories" style="background: #1e293b;">📋 Yelp & Yellow Pages</option>
+                <option value="all" style="background: #1e293b;">ðŸŒ All Sources (Max Leads)</option>
+                <option value="google_maps" style="background: #1e293b;">ðŸ“ Google Maps Only</option>
+                <option value="instagram" style="background: #1e293b;">ðŸ“¸ Instagram Only</option>
+                <option value="facebook" style="background: #1e293b;">ðŸ“˜ Facebook Only</option>
+                <option value="directories" style="background: #1e293b;">ðŸ“‹ Yelp & Yellow Pages</option>
             </select>
 
-            <button type="submit" class="search-btn" style="width: 100%;">🚀 Discover &amp; Generate Previews</button>
+            <button type="submit" class="search-btn" style="width: 100%;">ðŸš€ Discover &amp; Generate Previews</button>
         </div>
         <div class="search-hints">
-            <span class="hint" onclick="setSearch('Restaurant Barcelona')">🍕 Restaurant Barcelona</span>
-            <span class="hint" onclick="setSearch('Salon Milano')">💇 Salon Milano</span>
-            <span class="hint" onclick="setSearch('Hotel Roma')">🏨 Hotel Roma</span>
-            <span class="hint" onclick="setSearch('Gym Madrid')">💪 Gym Madrid</span>
-            <span class="hint" onclick="setSearch('Dentist Paris')">🦷 Dentist Paris</span>
-            <span class="hint" onclick="setBatch()">📋 Paste Batch Example</span>
+            <span class="hint" onclick="setSearch('Restaurant Barcelona')">ðŸ• Restaurant Barcelona</span>
+            <span class="hint" onclick="setSearch('Salon Milano')">ðŸ’‡ Salon Milano</span>
+            <span class="hint" onclick="setSearch('Hotel Roma')">ðŸ¨ Hotel Roma</span>
+            <span class="hint" onclick="setSearch('Gym Madrid')">ðŸ’ª Gym Madrid</span>
+            <span class="hint" onclick="setSearch('Dentist Paris')">ðŸ¦· Dentist Paris</span>
+            <span class="hint" onclick="setBatch()">ðŸ“‹ Paste Batch Example</span>
         </div>
     </form>
 </div>
@@ -42,10 +42,10 @@
 <div class="card" id="queue-card" style="border-color: rgba(99,179,237,0.3); margin-bottom: 1.5rem;">
     <div class="card-header"
         style="background: rgba(99,179,237,0.05); display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="color: #63b3ed;">⏳ Search Queue</h3>
+        <h3 style="color: #63b3ed;">â³ Search Queue</h3>
         <span style="font-size: 0.85rem; color: #94a3b8;">
-            {{ queue.done }} done · {{ queue.pending }} pending · {{ queue.running }} running
-            {% if queue.error > 0 %} · {{ queue.error }} failed{% endif %}
+            {{ queue.done }} done Â· {{ queue.pending }} pending Â· {{ queue.running }} running
+            {% if queue.error > 0 %} Â· {{ queue.error }} failed{% endif %}
         </span>
     </div>
     <div class="card-body" style="padding: 0.75rem 1.25rem;">
@@ -61,8 +61,8 @@
             style="font-size: 0.85rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
             <div>
                 <strong style="color: #e2e8f0;">{{ pct }}% complete</strong>
-                {% if queue.running > 0 %} — currently searching…{% endif %}
-                {% if queue.pending == 0 and queue.running == 0 %} — <span style="color: #48bb78;">✓ All done!</span>{%
+                {% if queue.running > 0 %} â€” currently searchingâ€¦{% endif %}
+                {% if queue.pending == 0 and queue.running == 0 %} â€” <span style="color: #48bb78;">âœ“ All done!</span>{%
                 endif %}
             </div>
 
@@ -72,7 +72,7 @@
                 style="margin: 0;">
                 <button type="submit" class="btn btn-sm btn-outline"
                     style="border-color: rgba(231, 76, 60, 0.5); color: #e74c3c; padding: 0.2rem 0.6rem; font-size: 0.75rem;">
-                    🛑 Stop & Clear Queue
+                    ðŸ›‘ Stop & Clear Queue
                 </button>
             </form>
             {% endif %}
@@ -84,21 +84,21 @@
 <!-- Stats -->
 <div class="stats-grid">
     <div class="stat-card stat-primary">
-        <div class="stat-icon">📨</div>
+        <div class="stat-icon">ðŸ“¨</div>
         <div class="stat-info">
             <span class="stat-value">{{ stats.sent }}</span>
             <span class="stat-label">Emails Sent</span>
         </div>
     </div>
     <div class="stat-card stat-success">
-        <div class="stat-icon">💬</div>
+        <div class="stat-icon">ðŸ’¬</div>
         <div class="stat-info">
             <span class="stat-value">{{ stats.replies }}</span>
             <span class="stat-label">Replies</span>
         </div>
     </div>
     <div class="stat-card stat-accent">
-        <div class="stat-icon">📈</div>
+        <div class="stat-icon">ðŸ“ˆ</div>
         <div class="stat-info">
             <span class="stat-value">{{ stats.rate }}%</span>
             <span class="stat-label">Reply Rate</span>
@@ -117,22 +117,22 @@
                 <div class="wf-number">1</div>
                 <div class="wf-text"><strong>Search</strong><br>Find businesses via Google Places</div>
             </div>
-            <div class="wf-arrow">→</div>
+            <div class="wf-arrow">â†’</div>
             <div class="wf-step">
                 <div class="wf-number">2</div>
                 <div class="wf-text"><strong>Extract</strong><br>Get emails from websites</div>
             </div>
-            <div class="wf-arrow">→</div>
+            <div class="wf-arrow">â†’</div>
             <div class="wf-step">
                 <div class="wf-number">3</div>
                 <div class="wf-text"><strong>Filter</strong><br>Only reliable email addresses</div>
             </div>
-            <div class="wf-arrow">→</div>
+            <div class="wf-arrow">â†’</div>
             <div class="wf-step">
                 <div class="wf-number">4</div>
                 <div class="wf-text"><strong>Preview</strong><br>Review before sending</div>
             </div>
-            <div class="wf-arrow">→</div>
+            <div class="wf-arrow">â†’</div>
             <div class="wf-step">
                 <div class="wf-number">5</div>
                 <div class="wf-text"><strong>Send</strong><br>Personalized emails</div>
@@ -152,20 +152,20 @@
             <form method="POST" action="/send-all-ready" id="sendAllForm" onsubmit="
                     var btn = document.getElementById('sendAllBtn');
                     btn.disabled = true;
-                    btn.textContent = '⏳ Sending...';
+                    btn.textContent = 'â³ Sending...';
                     btn.style.opacity = '0.6';
                     btn.style.cursor = 'not-allowed';
                     return true;
                 ">
                 <button id="sendAllBtn" type="submit" class="btn btn-sm btn-primary"
                     style="background: linear-gradient(135deg, #48bb78, #38a169); border: none; font-weight: 600;">
-                    🚀 Send All Ready ({{ ready_count }})
+                    ðŸš€ Send All Ready ({{ ready_count }})
                 </button>
             </form>
             {% elif runs | selectattr('status', 'equalto', 'sending') | list | length > 0 %}
             <span
                 style="background: rgba(72,187,120,0.1); color: #48bb78; border: 1px solid rgba(72,187,120,0.2); border-radius: 8px; padding: 0.3rem 0.75rem; font-size: 0.82rem; font-weight: 600;">
-                📨 Sending in progress...
+                ðŸ“¨ Sending in progress...
             </span>
             {% endif %}
             <a href="/pipelines" class="btn btn-sm btn-outline">View All History</a>
@@ -193,14 +193,14 @@
                         <td>{{ r.found }}</td>
                         <td>{{ r.qualified }}</td>
                         <td>{{ r.sent }}</td>
-                        <td><span class="status-badge status-{{ r.status }}">{{ r.status }}</span></td>
+                        <td><span class="status-badge status-{{ r.status.replace('_', ' ') if r.status else '' }}">{{ r.status.replace('_', ' ') if r.status else '' }}</span></td>
                         <td>
                             <a href="/results/{{ r.id }}" class="btn btn-xs btn-outline">View</a>
                             <form method="POST" action="/api/pipeline/{{ r.id }}/delete" style="display:inline;"
                                 onsubmit="return confirm('Delete this pipeline run entirely?');">
                                 <button type="submit" class="btn btn-xs btn-outline"
                                     style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;"
-                                    title="Delete">🗑️</button>
+                                    title="Delete">ðŸ—‘ï¸</button>
                             </form>
                         </td>
                     </tr>
@@ -215,7 +215,7 @@
 <!-- Danger Zone / Data Reset -->
 <div class="card" style="border-color: rgba(231, 76, 60, 0.3); margin-top: 2rem;">
     <div class="card-header" style="background: rgba(231, 76, 60, 0.05);">
-        <h3 style="color: #e74c3c;">⚠️ Danger Zone & Reset</h3>
+        <h3 style="color: #e74c3c;">âš ï¸ Danger Zone & Reset</h3>
         <p style="font-size: 0.9rem; color: #94a3b8; margin-top: 0.25rem;">Use these options to clean up your workspace
             or stop background tasks.</p>
     </div>
@@ -225,7 +225,7 @@
             onsubmit="return confirm('Are you absolutely sure you want to delete ALL search history and pipeline runs?\n\nThis will clear your dashboard entirely.');"
             style="margin: 0;">
             <button type="submit" class="btn btn-outline" style="border-color: rgba(231,76,60,0.5); color: #e74c3c;">
-                🗑️ Delete All Past Searches
+                ðŸ—‘ï¸ Delete All Past Searches
             </button>
         </form>
 
@@ -234,7 +234,7 @@
             onsubmit="return confirm('Are you sure you want to cancel ALL automated follow-up emails?\n\nThis will instantly stop the sequence tracker and prevent any scheduled follow-ups from sending. Use this if you hit SMTP rate limits.');"
             style="margin: 0;">
             <button type="submit" class="btn btn-outline" style="border-color: rgba(243,156,18,0.5); color: #f39c12;">
-                🛑 Cancel All Automated Follow-ups
+                ðŸ›‘ Cancel All Automated Follow-ups
             </button>
         </form>
     </div>
@@ -255,7 +255,7 @@
         ta.style.height = 'auto';
     }
     function setBatch() {
-        const example = `Beauty Salon – Bend, OR\nCafé – Medford, OR\nGym – Eugene, OR\nDentist – Salem, OR\nPhotographer – Portland, OR`;
+        const example = `Beauty Salon â€“ Bend, OR\nCafÃ© â€“ Medford, OR\nGym â€“ Eugene, OR\nDentist â€“ Salem, OR\nPhotographer â€“ Portland, OR`;
         const ta = document.getElementById('searchTextarea');
         ta.value = example;
         autoGrow(ta);

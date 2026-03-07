@@ -672,20 +672,23 @@ strong {
     color: var(--success);
 }
 
-.status-sent {
+.status-sent,
+.status-done {
     background: var(--success-bg);
     color: var(--success);
 }
 
 .status-failed,
-.status-error {
+.status-error,
+.status-timeout {
     background: var(--danger-bg);
     color: var(--danger);
 }
 
 .status-paused,
 .status-scoring,
-.status-filtering {
+.status-filtering,
+.status-partial {
     background: var(--warning-bg);
     color: var(--warning);
 }
@@ -693,7 +696,10 @@ strong {
 .status-searching,
 .status-discovering,
 .status-extracting,
-.status-running {
+.status-running,
+.status-pending,
+.status-no_emails,
+.status-no_website {
     background: var(--info-bg);
     color: var(--info);
 }
