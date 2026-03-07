@@ -100,3 +100,23 @@ ClientEngine is built to protect your domain reputation:
 
 ---
 *If you find this project useful, please consider giving it a ⭐ on GitHub!*
+
+## Testing
+Run the automated regression suite locally:
+
+```bash
+python -m unittest discover -v
+```
+
+If you only want the core unit tests folder:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The suite covers:
+- pipeline state/status decisions
+- email extraction and obfuscation handling
+- qualification rules
+- Google discovery pagination/dedup behaviors (mocked)
+- website check/fallback behaviors (mocked)
