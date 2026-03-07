@@ -1,7 +1,7 @@
-﻿"""
-ClientEngine v4 â€” Simple, Connected, Smart.
-4 pages: Home â†’ Results â†’ Analytics â†’ Settings.
-One continuous workflow: Search â†’ Extract â†’ Score â†’ Preview â†’ Send â†’ Track.
+"""
+ClientEngine v4 — Simple, Connected, Smart.
+4 pages: Home → Results → Analytics → Settings.
+One continuous workflow: Search → Extract → Score → Preview → Send → Track.
 """
 import json
 import time
@@ -114,9 +114,9 @@ init_db()
 # Start background sequence daemon
 start_daemon()
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# STARTUP SELF-HEALING â€” Fix anything stuck from a crash
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
+# STARTUP SELF-HEALING — Fix anything stuck from a crash
+# ═══════════════════════════════════════════════════════════
 try:
     import os
     os.makedirs("data", exist_ok=True)
@@ -132,26 +132,26 @@ try:
         (STATUS_FAILED, json.dumps({"error": "Server restarted while process was running. Please start a new process."}), *_stuck_search_states)
     )
     # 3. Reset 'sending' pipelines back to 'ready' so user can re-send them
-    #    (Don't mark as 'failed' â€” the emails are already generated, just need to resume sending)
+    #    (Don't mark as 'failed' — the emails are already generated, just need to resume sending)
     _startup_conn.execute("UPDATE pipeline_runs SET status=? WHERE status=?", (STATUS_READY, STATUS_SENDING))
-    # 4. Leave 'paused' pipelines as-is â€” they were rate-limited and can be resumed
+    # 4. Leave 'paused' pipelines as-is — they were rate-limited and can be resumed
     _startup_conn.commit()
     _pending = _startup_conn.execute("SELECT COUNT(*) FROM search_queue WHERE status='pending'").fetchone()[0]
     _startup_conn.close()
     if _pending > 0:
-        print(f"ðŸ“‹ Found {_pending} pending queue items from previous session â€” restarting queue worker.")
+        print(f"📋 Found {_pending} pending queue items from previous session — restarting queue worker.")
 except Exception:
     _pending = 0
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# PIPELINE KILL REGISTRY â€” Tracks active pipeline events for cancellation
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────
+# PIPELINE KILL REGISTRY — Tracks active pipeline events for cancellation
+# ─────────────────────────────────────────────────────────
 _pipeline_kill_events = {}   # pipeline_id -> threading.Event
 _pipeline_kill_lock = threading.Lock()
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# PIPELINE LOGGER â€” Writes timestamped debug logs per search
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────
+# PIPELINE LOGGER — Writes timestamped debug logs per search
+# ─────────────────────────────────────────────────────────
 PIPELINE_LOG_FILE = "data/pipeline_events.log"
 
 
@@ -161,9 +161,9 @@ def _pipeline_log(pipeline_id, event, message="", level="info"):
     log_fn = getattr(logger, level, logger.info)
     log_fn(payload)
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# BATCH QUEUE WORKER â€” Runs pending searches sequentially
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────
+# BATCH QUEUE WORKER — Runs pending searches sequentially
+# ─────────────────────────────────────────────────────────
 _queue_lock = threading.Lock()
 _queue_running = False
 
@@ -196,7 +196,7 @@ def _run_queue_worker():
             with _pipeline_kill_lock:
                 _pipeline_kill_events[pid] = kill_event
 
-            # Run the FULL pipeline (discover â†’ extract â†’ score â†’ email preview)
+            # Run the FULL pipeline (discover → extract → score → email preview)
             _execute_pipeline(pid, query, location, source_choice, kill_event)
 
             with db_session() as conn:
@@ -245,9 +245,9 @@ if _pending > 0:
     _start_queue_if_idle()
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 1. HOME â€” Search box + Stats
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
+# 1. HOME — Search box + Stats
+# ═══════════════════════════════════════════════════════════
 
 @app.route("/")
 def home():
@@ -264,7 +264,7 @@ def home():
 
     # Count how many are ready to send
     ready_count = conn.execute(
-        "SELECT COUNT(*) FROM pipeline_runs WHERE status IN ('ready','partial','timeout')"
+        "SELECT COUNT(*) FROM pipeline_runs WHERE status IN ('ready','partial','timeout','paused')"
     ).fetchone()[0]
 
     history = get_search_history(limit=5)
@@ -312,7 +312,7 @@ def reset_searches():
                 kill_event.set()
                 _pipeline_log(pid, "reset_searches_cancelling", "User clicked Reset Searches")
                 
-    flash("ðŸ—‘ï¸ All past searches and pipeline history have been deleted.", "success")
+    flash("🗑️ All past searches and pipeline history have been deleted.", "success")
     return redirect(url_for("home"))
 
 @app.route("/api/reset/followups", methods=["POST"])
@@ -320,7 +320,7 @@ def reset_followups():
     """Instantly stop all automated follow-up emails."""
     from database import cancel_all_sequences
     cancel_all_sequences()
-    flash("ðŸ›‘ All automated follow-up emails have been instantly cancelled.", "success")
+    flash("🛑 All automated follow-up emails have been instantly cancelled.", "success")
     return redirect(url_for("home"))
 
 @app.route("/api/reset/manual_leads", methods=["POST"])
@@ -328,7 +328,7 @@ def reset_manual_leads():
     """Wipe all manual leads."""
     from database import clear_all_manual_leads
     clear_all_manual_leads()
-    flash("ðŸ—‘ï¸ All manual leads have been deleted.", "success")
+    flash("🗑️ All manual leads have been deleted.", "success")
     return redirect(url_for("manual_leads"))
 
 
@@ -338,19 +338,19 @@ def send_all_ready():
     global _send_all_running
     with _send_all_lock:
         if _send_all_running:
-            flash("â³ Already sending â€” wait for current batch to finish before pressing again.", "warning")
+            flash("⏳ Already sending — wait for current batch to finish before pressing again.", "warning")
             return redirect(url_for("home"))
         _send_all_running = True
 
     conn = get_db()
     ready_runs = conn.execute(
-        "SELECT id FROM pipeline_runs WHERE status IN ('ready','partial','timeout')"
+        "SELECT id FROM pipeline_runs WHERE status IN ('ready','partial','timeout','paused')"
     ).fetchall()
     conn.close()
 
     if not ready_runs:
         _send_all_running = False
-        flash("No ready pipelines found.", "warning")
+        flash("No resumable pipelines found.", "warning")
         return redirect(url_for("home"))
 
     ids = [row["id"] for row in ready_runs]
@@ -370,7 +370,7 @@ def send_all_ready():
             _send_all_running = False
 
     threading.Thread(target=_send_all_worker, daemon=True).start()
-    flash(f"ðŸš€ Sending queued for {count} pipeline(s)! Check Analytics for live progress.", "success")
+    flash(f"🚀 Sending queued for {count} pipeline(s)! Check Analytics for live progress.", "success")
     return redirect(url_for("analytics_page"))
 
 @app.route("/pipelines")
@@ -388,13 +388,13 @@ def all_pipelines():
     )
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 2. SEARCH PIPELINE â€” Discover â†’ Extract â†’ Score â†’ Filter
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
+# 2. SEARCH PIPELINE — Discover → Extract → Score → Filter
+# ═══════════════════════════════════════════════════════════
 
 @app.route("/search", methods=["POST"])
 def search_pipeline():
-    """Run the entire search â†’ extract â†’ score â†’ filter pipeline."""
+    """Run the entire search → extract → score → filter pipeline."""
     raw_query = request.form.get("query", "").strip()
     source_choice = request.form.get("source", "all")
     
@@ -408,8 +408,8 @@ def search_pipeline():
     if len(lines) > 1:
         parsed = []
         for line in lines:
-            # Accept: "Beauty Salon â€“ Bend, OR" or "Beauty Salon - Bend, OR" or "Beauty Salon Bend, OR"
-            for sep in ["â€“", "-", ","]:
+            # Accept: "Beauty Salon – Bend, OR" or "Beauty Salon - Bend, OR" or "Beauty Salon Bend, OR"
+            for sep in ["–", "-", ","]:
                 if sep in line:
                     parts = line.split(sep, 1)
                     parsed.append((parts[0].strip(), parts[1].strip()))
@@ -419,12 +419,12 @@ def search_pipeline():
                 parsed.append((words[0], words[1] if len(words) > 1 else ""))
         enqueue_searches(parsed, source_choice)
         _start_queue_if_idle()
-        flash(f"â³ Batch of {len(parsed)} searches queued! They will run one by one.", "success")
+        flash(f"⏳ Batch of {len(parsed)} searches queued! They will run one by one.", "success")
         return redirect(url_for("home"))
 
     # Single-line mode (original behaviour)
     single = lines[0] if lines else raw_query
-    for sep in ["â€“", "-", ","]:
+    for sep in ["–", "-", ","]:
         if sep in single:
             parts = single.split(sep, 1)
             business_type, location = parts[0].strip(), parts[1].strip()
@@ -922,9 +922,9 @@ def api_pipeline_status(pipeline_id):
     return jsonify(payload)
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 3. SEND â€” Send emails to qualified businesses
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
+# 3. SEND — Send emails to qualified businesses
+# ═══════════════════════════════════════════════════════════
 
 def _do_send_pipeline(pipeline_id):
     """
@@ -1350,8 +1350,8 @@ def edit_pipeline_email(pipeline_id):
     return jsonify({"success": found})
 
 
-# 4. ANALYTICS â€” Track everything
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# 4. ANALYTICS — Track everything
+# ═══════════════════════════════════════════════════════════
 
 @app.route("/analytics")
 def analytics_page():
@@ -1412,13 +1412,13 @@ def mark_replied_route(log_id):
         )
     conn.commit()
     conn.close()
-    flash("Marked as replied âœ“", "success")
+    flash("Marked as replied ✓", "success")
     return redirect(url_for("analytics_page"))
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # SETTINGS
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 @app.route("/settings")
 def settings_page():
@@ -1446,7 +1446,7 @@ def update_settings_route():
         "pause_on_bounce": "true" if request.form.get("pause_on_bounce") == "on" else "false",
     }
     update_settings(data)
-    flash("Settings saved âœ“", "success")
+    flash("Settings saved ✓", "success")
     return redirect(url_for("settings_page"))
 
 
@@ -1462,7 +1462,7 @@ def test_email_route():
     success, error = send_test_email(to_email, settings)
 
     if success:
-        flash(f"Test email sent to {to_email} âœ“", "success")
+        flash(f"Test email sent to {to_email} ✓", "success")
     else:
         flash(f"Failed: {error}", "error")
 
@@ -1476,9 +1476,9 @@ def reset_database_route():
     return redirect(url_for("home"))
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # UNSUBSCRIBE
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 @app.route("/unsubscribe/<token>")
 def unsubscribe_route(token):
@@ -1488,9 +1488,9 @@ def unsubscribe_route(token):
     return render_template("unsubscribe.html", success=False)
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# API â€” Spam check
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
+# API — Spam check
+# ═══════════════════════════════════════════════════════════
 
 @app.route("/api/spam-check", methods=["POST"])
 def api_spam_check():
@@ -1498,9 +1498,9 @@ def api_spam_check():
     return jsonify(check_spam_score(data.get("subject", ""), data.get("body", "")))
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # MANUAL LEADS
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 @app.route("/manual")
 def manual_leads_page():
@@ -1517,9 +1517,9 @@ def update_manual_lead(lead_id):
     return redirect(url_for("manual_leads_page"))
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # LEADS & CAMPAIGNS (Wired up for v5 E2E Verification)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 @app.route("/leads")
 def leads_page():
@@ -1626,9 +1626,10 @@ def preview_campaign_route(campaign_id):
     flash("Preview not fully wired up yet!", "warning")
     return redirect(url_for("campaigns_page"))
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 # RUN
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═══════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     app.run(debug=DEBUG, port=PORT, host="0.0.0.0")
+
