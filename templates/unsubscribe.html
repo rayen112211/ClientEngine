@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unsubscribe</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #0f1117;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            padding: 3rem;
+            max-width: 500px;
+        }
+
+        .icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        p {
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        {% if success %}
+        <div class="icon">✅</div>
+        <h1>Unsubscribed</h1>
+        <p>You have been unsubscribed successfully. You will not receive further emails.</p>
+        {% else %}
+        <div class="icon">❌</div>
+        <h1>Invalid Link</h1>
+        <p>This unsubscribe link is invalid or has already been used.</p>
+        {% endif %}
+    </div>
+</body>
+
+</html>

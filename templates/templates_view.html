@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Templates — ClientEngine{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Email Templates</h1>
+    <p class="subtitle">Preview all {{ templates | length * 5 }} templates across {{ templates | length }} business
+        types × 5 sequence steps</p>
+</div>
+
+<!-- Template Selector -->
+<div class="template-nav">
+    {% for btype in templates.keys() %}
+    <button class="template-tab {% if loop.first %}active{% endif %}" onclick="showTemplateGroup('{{ btype }}', this)">
+        {{ business_types.get(btype, {}).get('label', btype) }}
+    </button>
+    {% endfor %}
+</div>
+
+<!-- Template Groups -->
+{% for btype, steps in templates.items() %}
+<div class="template-group {% if loop.first %}active{% endif %}" id="tpl-{{ btype }}">
+    <div class="sequence-timeline">
+        {% for step_num in [1, 2, 3, 4, 5] %}
+        {% if step_num in steps %}
+        {% set tpl = steps[step_num] %}
+        <div class="sequence-card">
+            <div class="seq-header">
+                <span class="step-badge step-{{ step_num }}">Email {{ step_num }}</span>
+                <span class="seq-theme">{{ step_names.get(step_num, '') }}</span>
+                <span class="seq-day">
+                    {% if step_num == 1 %}Day 0
+                    {% elif step_num == 2 %}Day 3
+                    {% elif step_num == 3 %}Day 7
+                    {% elif step_num == 4 %}Day 14
+                    {% elif step_num == 5 %}Day 21
+                    {% endif %}
+                </span>
+            </div>
+            <div class="seq-subjects">
+                <strong>Subject Lines (random rotation):</strong>
+                <ul>
+                    {% for subj in tpl.subject_variants %}
+                    <li>{{ subj }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="seq-body">
+                <strong>Body:</strong>
+                <pre class="email-preview">{{ tpl.body }}</pre>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+<script>
+    function showTemplateGroup(btype, btn) {
+        document.querySelectorAll('.template-group').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.template-tab').forEach(el => el.classList.remove('active'));
+        document.getElementById('tpl-' + btype).classList.add('active');
+        btn.classList.add('active');
+    }
+</script>
+{% endblock %}

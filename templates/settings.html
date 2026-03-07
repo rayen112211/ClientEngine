@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Settings — ClientEngine{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Settings</h1>
+    <p class="subtitle">SMTP and sending automation configuration</p>
+</div>
+
+<div class="grid-2col">
+    <!-- SMTP Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📧 Email Settings</h3>
+        </div>
+        <form method="POST" action="/settings/update">
+            <div class="card-body">
+                <div class="form-group">
+                    <label>SMTP Host</label>
+                    <input type="text" name="smtp_host" value="{{ settings.get('smtp_host', 'mail.spacemail.com') }}">
+                </div>
+                <div class="form-group">
+                    <label>SMTP Port <small style="opacity:.6">(587 = TLS, 465 = SSL)</small></label>
+                    <input type="number" name="smtp_port" value="{{ settings.get('smtp_port', '587') }}">
+                </div>
+                <div class="form-group">
+                    <label>Username (Email)</label>
+                    <input type="text" name="smtp_user" value="{{ settings.get('smtp_user', '') }}"
+                        placeholder="hello@rayenlazizi.tech">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="smtp_password" value="{{ settings.get('smtp_password', '') }}"
+                        placeholder="SMTP password">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="smtp_use_ssl" {{ 'checked' if settings.get('smtp_use_ssl', 'false'
+                            )=='true' }}> Use SSL (Port 465) / SSL Off (Port 587)
+                    </label>
+                </div>
+                <hr style="border-color: rgba(148,163,184,0.15); margin: 1rem 0">
+                <div class="form-group">
+                    <label>Your Name</label>
+                    <input type="text" name="from_name" value="{{ settings.get('from_name', 'Rayen') }}">
+                </div>
+                <div class="form-group">
+                    <label>From Email</label>
+                    <input type="email" name="from_email" value="{{ settings.get('from_email', '') }}">
+                </div>
+                <div class="form-group">
+                    <label>Reply-To Email <small style="opacity:.6">(for SPF/DKIM alignment)</small></label>
+                    <input type="email" name="reply_to"
+                        value="{{ settings.get('reply_to', settings.get('from_email','')) }}"
+                        placeholder="hello@rayenlazizi.tech">
+                </div>
+                <div class="form-group">
+                    <label>Portfolio Link</label>
+                    <input type="text" name="portfolio_link" value="{{ settings.get('portfolio_link', '') }}">
+                </div>
+                <hr style="border-color: rgba(148,163,184,0.15); margin: 1rem 0">
+                <div class="form-group">
+                    <label>📍 Google Places API Key</label>
+                    <input type="text" name="google_places_api_key"
+                        value="{{ settings.get('google_places_api_key', '') }}" placeholder="AIzaSy...">
+                    <small class="form-hint">Required for business discovery. <a
+                            href="https://console.cloud.google.com/apis/credentials" target="_blank">Get one
+                            here</a></small>
+                </div>
+                <hr style="border-color: rgba(148,163,184,0.15); margin: 1rem 0">
+                <p style="font-weight:600; margin-bottom:.75rem;">⚙️ Sending Controls</p>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:.75rem;">
+                    <div class="form-group">
+                        <label>Delay Min (seconds)</label>
+                        <input type="number" name="send_delay_min" value="{{ settings.get('send_delay_min', '30') }}"
+                            min="10" max="300">
+                    </div>
+                    <div class="form-group">
+                        <label>Delay Max (seconds)</label>
+                        <input type="number" name="send_delay_max" value="{{ settings.get('send_delay_max', '60') }}"
+                            min="10" max="300">
+                    </div>
+                    <div class="form-group">
+                        <label>Micro-Test Batch Size</label>
+                        <input type="number" name="micro_test_size" value="{{ settings.get('micro_test_size', '2') }}"
+                            min="1" max="10">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:.5rem;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="micro_test_enabled" {{ 'checked' if
+                            settings.get('micro_test_enabled','true')=='true' }}>
+                        Enable micro-test (send N first, pause if any bounce)
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="pause_on_bounce" {{ 'checked' if
+                            settings.get('pause_on_bounce','true')=='true' }}>
+                        Pause pipeline on bounce (recommended)
+                    </label>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Test & Info -->
+    <div>
+        <div class="card">
+            <div class="card-header">
+                <h3>🧪 Test Email</h3>
+            </div>
+            <form method="POST" action="/settings/test-email">
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Send test to</label>
+                        <input type="email" name="test_email" placeholder="your@email.com" required>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-accent">Send Test</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card" style="margin-top:1.5rem">
+            <div class="card-header">
+                <h3>📋 SpaceMail Setup</h3>
+            </div>
+            <div class="card-body">
+                <div class="steps-list compact">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <strong>Host & Port</strong>
+                            <p>Host: <code>mail.spacemail.com</code>, Port: <code>587</code></p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <strong>Authentication</strong>
+                            <p>Username: <code>hello@rayenlazizi.tech</code>, SSL: ❌ Off (Required for 587)</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <strong>SPF/DKIM/DMARC</strong>
+                            <p>DNS records on <code>rayenlazizi.tech</code> — no changes needed</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:1.5rem; border-color: rgba(239, 68, 68, 0.3);">
+            <div class="card-header" style="background: rgba(239, 68, 68, 0.05);">
+                <h3 style="color: #ef4444;">⚠️ Danger Zone</h3>
+            </div>
+            <div class="card-body">
+                <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 1rem;">
+                    Delete all leads, pipeline runs, analytics, and email tracking data. Only your settings will be
+                    saved.
+                </p>
+                <form method="POST" action="/settings/reset-database"
+                    onsubmit="return confirm('Are you completely sure? This will delete ALL system data, leads, and history. IT CANNOT BE UNDONE.');">
+                    <button type="submit" class="btn"
+                        style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); width: 100%;">
+                        Reset All Data
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

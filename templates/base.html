@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ClientEngine{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">⚡</div>
+                <span class="brand-text">ClientEngine</span>
+            </div>
+            <ul class="sidebar-nav">
+                <li><a href="/" class="{% if request.endpoint == 'home' %}active{% endif %}">
+                        <span class="nav-icon">🏠</span> Home
+                    </a></li>
+                <li><a href="/analytics" class="{% if request.endpoint == 'analytics_page' %}active{% endif %}">
+                        <span class="nav-icon">📊</span> Analytics
+                    </a></li>
+                <li><a href="/pipelines" class="{% if request.endpoint == 'all_pipelines' %}active{% endif %}">
+                        <span class="nav-icon">📂</span> All Searches
+                    </a></li>
+                <li><a href="/manual" class="{% if request.endpoint == 'manual_leads_page' %}active{% endif %}">
+                        <span class="nav-icon">✍️</span> Manual Leads
+                    </a></li>
+                <li><a href="/settings" class="{% if request.endpoint == 'settings_page' %}active{% endif %}">
+                        <span class="nav-icon">⚙️</span> Settings
+                    </a></li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="version-badge">v4.0 — ClientEngine</div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+                {{ message }}
+                <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

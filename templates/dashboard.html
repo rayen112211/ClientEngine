@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — ClientEngine{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p class="subtitle">Your client acquisition overview</p>
+</div>
+
+<!-- Top Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card stat-primary">
+        <div class="stat-icon">👥</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.total }}</span>
+            <span class="stat-label">Total Leads</span>
+        </div>
+    </div>
+    <div class="stat-card stat-success">
+        <div class="stat-icon">✅</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.by_status.get('enriched', 0) + stats.by_status.get('active', 0) }}</span>
+            <span class="stat-label">Qualified</span>
+        </div>
+    </div>
+    <div class="stat-card stat-warning">
+        <div class="stat-icon">📨</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ analytics.total_sent }}</span>
+            <span class="stat-label">Emails Sent</span>
+        </div>
+    </div>
+    <div class="stat-card stat-accent">
+        <div class="stat-icon">💬</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ analytics.total_replied }}</span>
+            <span class="stat-label">Replies</span>
+        </div>
+    </div>
+    <div class="stat-card stat-info">
+        <div class="stat-icon">📊</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ analytics.reply_rate }}%</span>
+            <span class="stat-label">Reply Rate</span>
+        </div>
+    </div>
+</div>
+
+<!-- Tier Breakdown & Business Types -->
+<div class="grid-2col">
+    <div class="card">
+        <div class="card-header">
+            <h3>Lead Quality Tiers</h3>
+        </div>
+        <div class="card-body">
+            <div class="tier-bars">
+                {% set tier_labels = {1: 'Tier 1 — Priority', 2: 'Tier 2 — Good', 3: 'Tier 3 — Lower'} %}
+                {% set tier_colors = {1: '#10b981', 2: '#f59e0b', 3: '#6b7280'} %}
+                {% for tier_num in [1, 2, 3] %}
+                {% set count = stats.by_tier.get(tier_num, 0) %}
+                {% set pct = (count / stats.total * 100) if stats.total > 0 else 0 %}
+                <div class="tier-bar-row">
+                    <div class="tier-label">{{ tier_labels[tier_num] }}</div>
+                    <div class="tier-bar-track">
+                        <div class="tier-bar-fill" style="width: {{ pct }}%; background: {{ tier_colors[tier_num] }}">
+                            {{ count }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if stats.total == 0 %}
+            <div class="empty-state">Import leads and run enrichment to see tier breakdown</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Business Types</h3>
+        </div>
+        <div class="card-body">
+            <div class="type-list">
+                {% for btype, count in stats.by_type.items() %}
+                <div class="type-row">
+                    <span class="type-name">{{ business_types.get(btype, {}).get('label', btype) }}</span>
+                    <span class="type-badge">{{ count }}</span>
+                </div>
+                {% endfor %}
+                {% if not stats.by_type %}
+                <div class="empty-state">Run enrichment to detect business types</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Campaigns -->
+<div class="card">
+    <div class="card-header">
+        <h3>Active Campaigns</h3>
+        <a href="/campaigns" class="btn btn-sm btn-primary">View All</a>
+    </div>
+    <div class="card-body">
+        {% if campaigns %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Campaign</th>
+                        <th>Status</th>
+                        <th>Leads</th>
+                        <th>Sent</th>
+                        <th>Replied</th>
+                        <th>Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in campaigns[:5] %}
+                    <tr>
+                        <td><strong>{{ c.name }}</strong></td>
+                        <td><span class="status-badge status-{{ c.status }}">{{ c.status }}</span></td>
+                        <td>{{ c.total_leads }}</td>
+                        <td>{{ c.total_sent }}</td>
+                        <td>{{ c.total_replied }}</td>
+                        <td>{{ ("%.1f"|format(c.total_replied / c.total_sent * 100)) if c.total_sent > 0 else '0' }}%
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No campaigns yet. <a href="/campaigns">Create one</a></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recent Emails -->
+<div class="card">
+    <div class="card-header">
+        <h3>Recent Emails</h3>
+        <a href="/log" class="btn btn-sm btn-primary">View All</a>
+    </div>
+    <div class="card-body">
+        {% if recent_emails %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Business</th>
+                        <th>Step</th>
+                        <th>Subject</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in recent_emails %}
+                    <tr>
+                        <td class="text-muted">{{ e.sent_at[:16] if e.sent_at else '' }}</td>
+                        <td>
+                            {% set lead_name_query = "SELECT business_name FROM leads WHERE id = " ~ e.lead_id %}
+                            Step {{ e.sequence_step }}
+                        </td>
+                        <td><span class="step-badge step-{{ e.sequence_step }}">Email {{ e.sequence_step }}</span></td>
+                        <td class="truncate">{{ e.subject }}</td>
+                        <td><span class="status-badge status-{{ e.status }}">{{ e.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No emails sent yet</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quick Start Guide -->
+{% if stats.total == 0 %}
+<div class="card card-highlight">
+    <div class="card-header">
+        <h3>🚀 Quick Start Guide</h3>
+    </div>
+    <div class="card-body">
+        <div class="steps-list">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <strong>Configure SMTP</strong>
+                    <p>Go to <a href="/settings">Settings</a> and enter your email credentials (Gmail App Password
+                        recommended)</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <strong>Import Leads</strong>
+                    <p>Go to <a href="/leads">Leads</a> and import a CSV or add leads manually</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <strong>Enrich & Score</strong>
+                    <p>Click "Enrich All" to check websites and calculate qualification scores</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <strong>Create Campaign</strong>
+                    <p>Go to <a href="/campaigns">Campaigns</a>, create one, enroll leads, and start sending</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">5</div>
+                <div class="step-content">
+                    <strong>Track & Optimize</strong>
+                    <p>Use <a href="/analytics">Analytics</a> to see what works and double down on winners</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

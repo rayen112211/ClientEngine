@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Email Log — ClientEngine{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Email Log</h1>
+    <p class="subtitle">Every email sent with full details</p>
+</div>
+
+<!-- Filter by campaign -->
+<div class="filter-bar">
+    <form method="GET" action="/log" class="filter-form">
+        <select name="campaign_id" onchange="this.form.submit()">
+            <option value="">All Campaigns</option>
+            {% for c in campaigns %}
+            <option value="{{ c.id }}" {{ 'selected' if current_campaign_id==c.id }}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+        {% if current_campaign_id %}
+        <a href="/log" class="btn btn-sm btn-outline">Clear Filter</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-body no-padding">
+        {% if logs %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Business Type</th>
+                        <th>Step</th>
+                        <th>Subject</th>
+                        <th>City</th>
+                        <th>Score</th>
+                        <th>Tier</th>
+                        <th>Status</th>
+                        <th>Reply</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="text-muted nowrap">{{ log.sent_at[:16] if log.sent_at else '' }}</td>
+                        <td><span class="type-badge-sm type-{{ log.business_type or 'other' }}">{{ log.business_type or
+                                'other' }}</span></td>
+                        <td><span class="step-badge step-{{ log.sequence_step }}">{{ step_names.get(log.sequence_step,
+                                'Email ' ~ log.sequence_step) }}</span></td>
+                        <td class="truncate" title="{{ log.subject }}">{{ log.subject }}</td>
+                        <td>{{ log.city or '—' }}</td>
+                        <td><span
+                                class="score-badge score-{% if (log.qualification_score or 0) >= 90 %}high{% elif (log.qualification_score or 0) >= 75 %}medium{% elif (log.qualification_score or 0) >= 60 %}normal{% else %}low{% endif %}">{{
+                                log.qualification_score or '—' }}</span></td>
+                        <td>{% if log.tier %}<span class="tier-badge tier-{{ log.tier }}">T{{ log.tier }}</span>{% else
+                            %}—{% endif %}</td>
+                        <td><span class="status-badge status-{{ log.status }}">{{ log.status }}</span></td>
+                        <td>
+                            {% if log.replied %}
+                            <span class="status-badge status-replied">✓ Replied</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not log.replied %}
+                            <form method="POST" action="/log/{{ log.id }}/replied" style="display:inline">
+                                <button type="submit" class="btn btn-xs btn-success" title="Mark as replied">💬</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 3rem">No emails logged yet</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

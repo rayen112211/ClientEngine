@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Search Results — ClientEngine{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Search Results</h1>
+    <p class="subtitle">Found {{ total }} businesses for "{{ business_type }}" in "{{ location }}"</p>
+</div>
+
+<!-- Summary Stats -->
+<div class="stats-grid">
+    <div class="stat-card stat-primary">
+        <div class="stat-icon">🏢</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total }}</span>
+            <span class="stat-label">Found</span>
+        </div>
+    </div>
+    <div class="stat-card stat-success">
+        <div class="stat-icon">📧</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ with_email }}</span>
+            <span class="stat-label">With Email</span>
+        </div>
+    </div>
+    <div class="stat-card stat-info">
+        <div class="stat-icon">🌐</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ with_website }}</span>
+            <span class="stat-label">With Website</span>
+        </div>
+    </div>
+    <div class="stat-card stat-accent">
+        <div class="stat-icon">📊</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total - with_email }}</span>
+            <span class="stat-label">No Email</span>
+        </div>
+    </div>
+</div>
+
+<!-- Actions -->
+<div class="actions-bar">
+    <form method="POST" action="/discover/import" style="display:inline">
+        <input type="hidden" name="results_data" value="{{ results_data }}">
+        <button type="submit" class="btn btn-primary">📥 Import All as Leads ({{ total }})</button>
+    </form>
+
+    {% if with_email > 0 %}
+    <form method="POST" action="/discover/auto-campaign" style="display:inline">
+        <input type="hidden" name="results_data" value="{{ results_data }}">
+        <input type="hidden" name="business_type" value="{{ business_type }}">
+        <input type="hidden" name="location" value="{{ location }}">
+        <input type="hidden" name="min_tier" value="1">
+        <button type="submit" class="btn btn-accent"
+            onclick="return confirm('This will: import leads → enrich → create campaign → send Email 1 to all qualified. Continue?')">
+            🚀 Auto-Campaign (Import + Enrich + Send)
+        </button>
+    </form>
+    {% endif %}
+
+    <a href="/discover" class="btn btn-outline">← New Search</a>
+</div>
+
+<!-- Results Table -->
+<div class="card">
+    <div class="card-body no-padding">
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Business</th>
+                        <th>Address</th>
+                        <th>Website</th>
+                        <th>Email</th>
+                        <th>Rating</th>
+                        <th>Reviews</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for biz in businesses %}
+                    <tr>
+                        <td><strong>{{ biz.business_name }}</strong></td>
+                        <td class="text-muted truncate" title="{{ biz.address }}">{{ biz.city or biz.address[:40] }}
+                        </td>
+                        <td>
+                            {% if biz.website %}
+                            <a href="{{ biz.website }}" target="_blank" class="truncate"
+                                style="max-width:150px;display:block">🌐 {{ biz.website[:30] }}...</a>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if biz.email %}
+                            <span class="status-badge status-active">{{ biz.email }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if biz.google_rating %}
+                            ⭐ {{ biz.google_rating }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>{{ biz.review_count or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

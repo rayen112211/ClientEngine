@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}Results — ClientEngine{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>{{ run.query }} {{ run.location }}</h1>
+    <p class="subtitle">Pipeline #{{ pipeline_id }}</p>
+</div>
+
+<!-- Pipeline Progress -->
+<div class="pipeline-progress" id="pipelineProgress">
+    <div
+        class="pipeline-step {% if run.status in ('searching','discovering','extracting','scoring','filtering','ready','sending','sent') %}done{% endif %}">
+        <div class="ps-icon">🔍</div>
+        <div class="ps-label">Found</div>
+        <div class="ps-value" id="count-found">{{ run.found }}</div>
+    </div>
+    <div class="pipeline-connector"></div>
+    <div
+        class="pipeline-step {% if run.status in ('extracting','scoring','filtering','ready','sending','sent') %}done{% endif %}">
+        <div class="ps-icon">🌐</div>
+        <div class="ps-label">With Website</div>
+        <div class="ps-value" id="count-website">{{ run.with_website }}</div>
+    </div>
+    <div class="pipeline-connector"></div>
+    <div class="pipeline-step {% if run.status in ('scoring','filtering','ready','sending','sent') %}done{% endif %}">
+        <div class="ps-icon">📧</div>
+        <div class="ps-label">Emails Found</div>
+        <div class="ps-value" id="count-email">{{ run.with_email }}</div>
+    </div>
+    <div class="pipeline-connector"></div>
+    <div class="pipeline-step {% if run.status in ('ready','sending','sent') %}done{% endif %} highlight">
+        <div class="ps-icon">✅</div>
+        <div class="ps-label">Qualified</div>
+        <div class="ps-value" id="count-qualified">{{ run.qualified }}</div>
+    </div>
+    {% if run.sent > 0 %}
+    <div class="pipeline-connector"></div>
+    <div class="pipeline-step done">
+        <div class="ps-icon">🚀</div>
+        <div class="ps-label">Sent</div>
+        <div class="ps-value">{{ run.sent }}</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Status Banner -->
+{% if run.status not in ('ready', 'sent', 'error', 'failed') %}
+<div class="status-banner processing" id="statusBanner">
+    <div class="spinner"></div>
+    <span id="statusText">
+        {% if run.status == 'searching' or run.status == 'discovering' %}
+        Searching for businesses...
+        {% elif run.status == 'extracting' %}
+        Extracting emails from websites...
+        {% elif run.status == 'scoring' %}
+        Scoring businesses...
+        {% elif run.status == 'filtering' %}
+        Filtering quality businesses...
+        {% elif run.status == 'sending' %}
+        Sending emails... Check Analytics for live progress.
+        {% else %}
+        Processing...
+        {% endif %}
+    </span>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<!-- Actions -->
+{% if run.status == 'ready' and qualified %}
+<div class="actions-bar">
+    <form method="POST" action="/send/{{ pipeline_id }}">
+        <button type="submit" class="btn btn-accent btn-lg">
+            🚀 Send {{ qualified|length }} Emails Now
+        </button>
+    </form>
+    <a href="/" class="btn btn-outline">← New Search</a>
+</div>
+{% elif run.status in ('error', 'failed') %}
+<div class="alert alert-error" style="margin-bottom: 1rem;">
+    {% if error %}{{ error }}{% else %}Search failed or was stopped.{% endif %}
+</div>
+<div class="actions-bar">
+    <form method="POST" action="/send/{{ pipeline_id }}">
+        <button type="submit" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">
+            🔄 Resume Sending ({{ qualified|length }})
+        </button>
+    </form>
+    <a href="/" class="btn btn-outline">← New Search</a>
+</div>
+{% elif run.status == 'sent' %}
+<div class="actions-bar">
+    <a href="/analytics" class="btn btn-primary">📊 View Analytics</a>
+    <a href="/" class="btn btn-outline">← New Search</a>
+</div>
+{% elif run.status in ('ready',) and not qualified %}
+<div class="actions-bar">
+    <a href="/" class="btn btn-outline">← Try Different Search</a>
+</div>
+{% endif %}
+
+<!-- Qualified Businesses (Email Previews) -->
+{% if qualified %}
+<h2 style="margin: 2rem 0 1rem">📧 Emails Ready to Send ({{ qualified|length }})</h2>
+{% for biz in qualified %}
+<div class="card email-card">
+    <div class="card-header">
+        <div style="display:flex;align-items:center;gap:0.75rem">
+            <strong>{{ biz.business_name }}</strong>
+            <span class="text-muted">→ {{ biz.email }}</span>
+        </div>
+        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+            {% if biz.dispatch_status == 'sent' %}
+            <span class="status-badge status-sent"><i class="fas fa-check"></i> Sent</span>
+            {% elif biz.dispatch_status == 'bounced' %}
+            <span class="status-badge status-bounced"><i class="fas fa-exclamation-triangle"></i> Bounced</span>
+            {% elif biz.dispatch_status == 'failed' %}
+            <span class="status-badge status-failed"><i class="fas fa-times"></i> Failed</span>
+            {% elif run.status == 'sending' %}
+            <span class="status-badge status-paused"><i class="fas fa-spinner fa-spin"></i> Sending/Waiting...</span>
+            {% endif %}
+
+            <!-- Source Badge -->
+            {% if biz.source == 'google_maps' %}
+            <span class="status-badge"
+                style="background: rgba(66, 133, 244, 0.1); color: #4285F4; border-color: rgba(66, 133, 244, 0.2);">📍
+                Maps</span>
+            {% elif biz.source == 'instagram' %}
+            <span class="status-badge"
+                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">📸
+                Instagram</span>
+            {% elif biz.source == 'facebook' %}
+            <span class="status-badge"
+                style="background: rgba(24, 119, 242, 0.1); color: #1877F2; border-color: rgba(24, 119, 242, 0.2);">📘
+                Facebook</span>
+            {% elif biz.source == 'directories' %}
+            <span class="status-badge"
+                style="background: rgba(211, 35, 35, 0.1); color: #d32323; border-color: rgba(211, 35, 35, 0.2);">📋
+                Yelp</span>
+            {% endif %}
+
+            <!-- Tier Badge -->
+            {% if biz.tier == 1 %}
+            <span class="status-badge"
+                style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">🔥
+                Tier 1</span>
+            {% elif biz.tier == 2 %}
+            <span class="status-badge"
+                style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);">⚡
+                Tier 2</span>
+            {% else %}
+            <span class="status-badge"
+                style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.3);">❄️
+                Tier 3</span>
+            {% endif %}
+
+            <!-- Channel Badge -->
+            {% if biz.outreach_channel == 'instagram_dm' %}
+            <span class="status-badge"
+                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border-color: rgba(225, 48, 108, 0.2);">📸
+                IG DM</span>
+            {% elif biz.outreach_channel == 'whatsapp' %}
+            <span class="status-badge"
+                style="background: rgba(37, 211, 102, 0.1); color: #25D366; border-color: rgba(37, 211, 102, 0.2);">💬
+                WhatsApp</span>
+            {% else %}
+            <span class="status-badge status-active">📧 Email</span>
+            {% endif %}
+
+            <span
+                class="score-badge score-{% if biz.score >= 80 %}high{% elif biz.score >= 60 %}medium{% else %}normal{% endif %}">Score:
+                {{ biz.score }}</span>
+            {% if biz.spam_score is defined and biz.spam_score > 0 %}
+            <span class="status-badge {% if biz.spam_safe %}status-active{% else %}status-paused{% endif %}">
+                Spam: {{ biz.spam_score }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if biz.dispatch_status == 'failed' and biz.dispatch_error %}
+        <div
+            style="background: rgba(231, 76, 60, 0.1); color: #e74c3c; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; border: 1px solid rgba(231, 76, 60, 0.2); display: flex; align-items: flex-start; gap: 0.5rem; line-height: 1.4;">
+            <i class="fas fa-exclamation-circle" style="margin-top: 0.1rem;"></i>
+            <div><strong>Email Provider Error:</strong> {{ biz.dispatch_error }}</div>
+        </div>
+        {% endif %}
+        <div class="email-meta">
+            {% if biz.google_rating %}<span>⭐ {{ biz.google_rating }}</span>{% endif %}
+            {% if biz.review_count %}<span>📊 {{ biz.review_count }} reviews</span>{% endif %}
+            {% if biz.city %}<span>📍 {{ biz.city }}</span>{% endif %}
+            {% if biz.pain_points %}<span class="pain-tag">🎯 {{ biz.pain_points|join(', ') }}</span>{% endif %}
+        </div>
+        {% if biz.email_subject %}
+        <div class="email-preview-block" id="preview-{{ loop.index }}">
+            <div class="ep-subject"><strong>Subject:</strong> <span id="subj-text-{{ loop.index }}">{{ biz.email_subject
+                    }}</span></div>
+            <pre class="email-preview" id="body-text-{{ loop.index }}">{{ biz.email_body }}</pre>
+
+            {% if run.status in ('ready', 'error', 'failed') and biz.dispatch_status not in ('sent', 'failed',
+            'bounced',
+            'skipped') %}
+            <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-sm btn-outline" onclick="toggleEdit({{ loop.index }})"
+                    style="font-size: 0.85rem;">
+                    ✏️ Edit Email
+                </button>
+                <button type="button" class="btn btn-sm btn-outline"
+                    onclick="skipEmail('{{ biz.email }}', {{ loop.index }})"
+                    style="font-size: 0.85rem; border-color: #e74c3c; color: #e74c3c;">
+                    🗑️ Remove from Queue
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="email-edit-block" id="edit-{{ loop.index }}"
+            style="display: none; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-top: 1rem;">
+            <label
+                style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">Subject</label>
+            <input type="text" id="subj-input-{{ loop.index }}" class="form-control" value="{{ biz.email_subject }}"
+                style="margin-bottom: 1rem; font-weight: 600; width: 100%;">
+
+            <label
+                style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">Body</label>
+            <textarea id="body-input-{{ loop.index }}" class="form-control"
+                style="height: 250px; font-family: monospace; font-size: 0.9rem; width: 100%;">{{ biz.email_body }}</textarea>
+
+            <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-sm btn-outline"
+                    onclick="toggleEdit({{ loop.index }})">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary"
+                    onclick="saveEmail('{{ biz.email }}', {{ loop.index }}, this)">💾 Save Changes</button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Skipped Businesses -->
+{% if skipped %}
+<details style="margin-top:2rem">
+    <summary class="text-muted" style="cursor:pointer;margin-bottom:1rem">
+        ⏭️ Skipped businesses ({{ skipped|length }}) — click to show
+    </summary>
+    <div class="card">
+        <div class="card-body no-padding">
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Business</th>
+                            <th>Score</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for biz in skipped %}
+                        <tr class="row-dimmed">
+                            <td>{{ biz.business_name }}</td>
+                            <td>{{ biz.score or '—' }}</td>
+                            <td class="text-muted">{{ biz.skip_reason or 'Low score' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</details>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function skipEmail(email, index) {
+        if (!confirm('Remove this email from the queue? It will not be sent.')) return;
+
+        const card = document.getElementById('preview-' + index).closest('.email-card');
+        card.style.opacity = '0.5';
+
+        const res = await fetch(`/api/pipeline/{{ pipeline_id }}/edit_email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, action: 'skip' })
+        });
+
+        if (res.ok) {
+            card.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-weight: 500;">🗑️ Email to ${email} removed from the queue.</div>`;
+        } else {
+            alert('Failed to skip email');
+            card.style.opacity = '1';
+        }
+    }
+
+    function toggleEdit(index) {
+        const preview = document.getElementById('preview-' + index);
+        const edit = document.getElementById('edit-' + index);
+        if (preview.style.display === 'none') {
+            preview.style.display = 'block';
+            edit.style.display = 'none';
+        } else {
+            preview.style.display = 'none';
+            edit.style.display = 'block';
+        }
+    }
+
+    async function saveEmail(email, index, btn) {
+        const subj = document.getElementById('subj-input-' + index).value;
+        const body = document.getElementById('body-input-' + index).value;
+        const originalText = btn.innerHTML;
+
+        btn.disabled = true;
+        btn.innerHTML = 'Saving...';
+
+        const res = await fetch(`/api/pipeline/{{ pipeline_id }}/edit_email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, action: 'update', subject: subj, body: body })
+        });
+
+        if (res.ok) {
+            document.getElementById('subj-text-' + index).innerText = subj;
+            document.getElementById('body-text-' + index).innerText = body;
+            toggleEdit(index);
+        } else {
+            alert('Failed to save email');
+        }
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+</script>
+
+{% if run.status not in ('ready', 'sent', 'error', 'done', 'paused') %}
+<script>
+    (function poll() {
+        fetch('/api/pipeline/{{ pipeline_id }}')
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ready' || data.status === 'sent' || data.status === 'error' || data.status === 'done' || data.status === 'paused') {
+                    location.reload();
+                } else {
+                    const txt = document.getElementById('statusText');
+                    if (txt) {
+                        const labels = {
+                            'discovering': 'Searching for businesses...',
+                            'searching': 'Searching for businesses...',
+                            'extracting': `Extracting emails... (${data.with_email || 0} found)`,
+                            'scoring': 'Scoring businesses...',
+                            'filtering': 'Filtering quality businesses...',
+                            'sending': `Sending emails... (${data.sent || 0} sent)`,
+                            'paused': `⏸ Paused (rate limit) — will auto-resume. ${data.sent || 0} sent so far.`,
+                        };
+                        txt.textContent = labels[data.status] || 'Processing...';
+
+                        // Update the visual tracker counters
+                        if (document.getElementById('count-found')) document.getElementById('count-found').textContent = data.found || 0;
+                        if (document.getElementById('count-website')) document.getElementById('count-website').textContent = data.with_website || 0;
+                        if (document.getElementById('count-email')) document.getElementById('count-email').textContent = data.with_email || 0;
+                        if (document.getElementById('count-qualified')) document.getElementById('count-qualified').textContent = data.qualified || 0;
+                    }
+                    setTimeout(poll, 2000);
+                }
+            })
+            .catch(() => setTimeout(poll, 3000));
+    })();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,372 @@
+{
+    "name": "Modular Cold Email Outreach",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "a1b2c3d4-0001-4000-8000-000000000001",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "typeVersion": 1,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "cold-email-trigger",
+                "responseMode": "onReceived",
+                "responseData": "allEntries"
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000002",
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                0,
+                560
+            ],
+            "webhookId": "cold-email-trigger-id"
+        },
+        {
+            "parameters": {
+                "mode": "raw",
+                "jsonOutput": "={{ { \"campaign_name\": $input.first().json.campaign_name ?? 'default_campaign', \"from_name\": $input.first().json.from_name ?? 'Rayen', \"portfolio_link\": $input.first().json.portfolio_link ?? 'https://rayenlazizi.tech', \"min_lead_score\": $input.first().json.min_lead_score ?? 6, \"delay_min_seconds\": $input.first().json.delay_min_seconds ?? 60, \"delay_max_seconds\": $input.first().json.delay_max_seconds ?? 180 } }}",
+                "options": {}
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000003",
+            "name": "Set Campaign Config",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                280,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "database",
+                "operation": "getAll",
+                "databaseId": "leads"
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000004",
+            "name": "Read Leads",
+            "type": "n8n-nodes-base.n8n",
+            "typeVersion": 1,
+            "position": [
+                520,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "filter-email-not-empty",
+                            "leftValue": "={{ $json.Email }}",
+                            "rightValue": "",
+                            "operator": {
+                                "type": "string",
+                                "operation": "isNotEmpty"
+                            }
+                        },
+                        {
+                            "id": "filter-lead-score",
+                            "leftValue": "={{ $json.Lead_Score }}",
+                            "rightValue": "={{ $('Set Campaign Config').first().json.min_lead_score }}",
+                            "operator": {
+                                "type": "number",
+                                "operation": "gte"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000005",
+            "name": "Filter Qualified Leads",
+            "type": "n8n-nodes-base.filter",
+            "typeVersion": 2,
+            "position": [
+                760,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "batchSize": 1,
+                "options": {}
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000006",
+            "name": "Loop Over Items",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                1000,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const item = $input.first().json;\nconst website = (item.Website || '').trim();\nconst condition_type = website.length > 0 ? 'has_website' : 'no_website';\nreturn [{ json: { ...item, condition_type: condition_type } }];"
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000007",
+            "name": "Detect Condition",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1240,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "database",
+                "operation": "getAll",
+                "databaseId": "email_templates"
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000008",
+            "name": "Read Templates",
+            "type": "n8n-nodes-base.n8n",
+            "typeVersion": 1,
+            "position": [
+                1480,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const lead = $('Detect Condition').first().json;\nconst condition_type = lead.condition_type;\nconst templates = $('Read Templates').all().map(t => t.json);\nconst template = templates.find(t => t.condition_type === condition_type);\nif (!template) { throw new Error(`No template found for condition_type: ${condition_type}`); }\nconst config = $('Set Campaign Config').first().json;\nlet subjects;\ntry { subjects = typeof template.subject_variants === 'string' ? JSON.parse(template.subject_variants) : template.subject_variants; } catch (e) { subjects = [template.subject_variants]; }\nconst selectedSubject = subjects[Math.floor(Math.random() * subjects.length)];\nlet body = template.body_text;\nconst replacements = { '{{Business_Name}}': lead.Business_Name || '', '{{City}}': lead.City || '', '{{Category}}': lead.Category || '', '{{FROM_NAME}}': config.from_name || 'Rayen', '{{PORTFOLIO_LINK}}': config.portfolio_link || 'https://rayenlazizi.tech', '{{OFFER_LINE}}': template.offer_line || '', '{{CONDITION_NOTE}}': template.condition_note || '' };\nfor (const [placeholder, value] of Object.entries(replacements)) { body = body.split(placeholder).join(value); }\nlet subject = selectedSubject;\nfor (const [placeholder, value] of Object.entries(replacements)) { subject = subject.split(placeholder).join(value); }\nconst delayMin = config.delay_min_seconds || 60;\nconst delayMax = config.delay_max_seconds || 180;\nconst randomDelay = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;\nreturn [{ json: { Business_Name: lead.Business_Name, Email: lead.Email, Category: lead.Category, City: lead.City, Website: lead.Website, condition_type: condition_type, email_subject: subject, email_body: body, from_name: config.from_name, template_id: template.template_id, campaign_name: config.campaign_name, random_delay: randomDelay } }];"
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000009",
+            "name": "Prepare Email",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1720,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "amount": "={{ $json.random_delay }}",
+                "unit": "seconds"
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000010",
+            "name": "Random Delay",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                1960,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "fromEmail": "={{ $json.from_name }} <your-email@gmail.com>",
+                "toEmail": "={{ $json.Email }}",
+                "subject": "={{ $json.email_subject }}",
+                "emailType": "text",
+                "message": "={{ $json.email_body }}",
+                "options": {}
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000011",
+            "name": "Send Email",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "position": [
+                2200,
+                420
+            ],
+            "credentials": {
+                "smtp": {
+                    "id": "REPLACE_WITH_YOUR_SMTP_CREDENTIAL_ID",
+                    "name": "SMTP Account"
+                }
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "jsCode": "const prevData = $('Prepare Email').first().json;\nconst sendResult = $input.first().json;\nlet status = 'sent';\nif (sendResult.error || sendResult.errorMessage) { status = 'failed'; }\nconst now = new Date().toISOString();\nreturn [{ json: { campaign_name: prevData.campaign_name, Business_Name: prevData.Business_Name, Email: prevData.Email, Template_ID: prevData.template_id, Subject: prevData.email_subject, Sent_At: now, Status: status } }];"
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000012",
+            "name": "Build Log Entry",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2440,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "database",
+                "operation": "append",
+                "databaseId": "sent_emails"
+            },
+            "id": "a1b2c3d4-0001-4000-8000-000000000013",
+            "name": "Log to Sent Emails",
+            "type": "n8n-nodes-base.n8n",
+            "typeVersion": 1,
+            "position": [
+                2680,
+                420
+            ]
+        }
+    ],
+    "connections": {
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Set Campaign Config",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Set Campaign Config",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Set Campaign Config": {
+            "main": [
+                [
+                    {
+                        "node": "Read Leads",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read Leads": {
+            "main": [
+                [
+                    {
+                        "node": "Filter Qualified Leads",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filter Qualified Leads": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Over Items",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Loop Over Items": {
+            "main": [
+                null,
+                [
+                    {
+                        "node": "Detect Condition",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Detect Condition": {
+            "main": [
+                [
+                    {
+                        "node": "Read Templates",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read Templates": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Email",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Email": {
+            "main": [
+                [
+                    {
+                        "node": "Random Delay",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Random Delay": {
+            "main": [
+                [
+                    {
+                        "node": "Send Email",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send Email": {
+            "main": [
+                [
+                    {
+                        "node": "Build Log Entry",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Log Entry": {
+            "main": [
+                [
+                    {
+                        "node": "Log to Sent Emails",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Log to Sent Emails": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Over Items",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

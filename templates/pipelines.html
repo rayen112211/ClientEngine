@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}All Searches — ClientEngine{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>All Pipeline Searches</h1>
+    <p class="subtitle">Complete history of all discoveries and emails</p>
+</div>
+
+<div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h3>Pipeline History</h3>
+        <a href="/" class="btn btn-sm btn-primary">New Search</a>
+    </div>
+    <div class="card-body no-padding">
+        {% if runs %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Search</th>
+                        <th>Found</th>
+                        <th>Qualified</th>
+                        <th>Sent</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in runs %}
+                    <tr>
+                        <td class="text-muted nowrap">{{ r.created_at[:16] if r.created_at else '' }}</td>
+                        <td><strong>{{ r.query }}</strong> {{ r.location }}</td>
+                        <td>{{ r.found }}</td>
+                        <td>{{ r.qualified }}</td>
+                        <td>{{ r.sent }}</td>
+                        <td><span class="status-badge status-{{ r.status }}">{{ r.status }}</span></td>
+                        <td>
+                            <a href="/results/{{ r.id }}" class="btn btn-xs btn-outline">View</a>
+                            {% if r.status == 'sending' %}
+                            <form method="POST" action="/stop_pipeline/{{ r.id }}" style="display:inline;"
+                                onsubmit="return confirm('Force Stop this pipeline from sending any more emails?');">
+                                <button type="submit" class="btn btn-xs btn-outline"
+                                    style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;">🛑
+                                    Stop</button>
+                            </form>
+                            {% endif %}
+                            <form method="POST" action="/api/pipeline/{{ r.id }}/delete" style="display:inline;"
+                                onsubmit="return confirm('Delete this pipeline run entirely?');">
+                                <button type="submit" class="btn btn-xs btn-outline"
+                                    style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;"
+                                    title="Delete">🗑️</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No searches found.</p>
+            <a href="/" class="btn btn-primary" style="margin-top: 1rem;">Start your first search</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

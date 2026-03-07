@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Manual Leads — ClientEngine{% endblock %}
+{% block content %}
+
+<div class="page-header"
+    style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1>Manual Leads</h1>
+        <p class="subtitle">Businesses without a website — reach them via WhatsApp or social media.</p>
+    </div>
+    <form method="POST" action="/api/reset/manual_leads"
+        onsubmit="return confirm('Are you sure you want to delete ALL manual leads from all sources?');"
+        style="margin: 0;">
+        <button type="submit" class="btn btn-outline" style="border-color: rgba(231,76,60,0.5); color: #e74c3c;">
+            🗑️ Delete All Manual Leads
+        </button>
+    </form>
+</div>
+
+<div
+    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+    <!-- TABS -->
+    <div class="tab-list" style="margin: 0;">
+        <button class="tab-btn active" onclick="switchTab('tab-new', this)">🆕 New Leads ({{ leads_new|length
+            }})</button>
+        <button class="tab-btn" onclick="switchTab('tab-contacted', this)">✅ Contacted ({{ leads_contacted|length
+            }})</button>
+    </div>
+
+    <!-- SOURCE FILTER -->
+    <form method="GET" action="/manual" style="display: flex; gap: 0.5rem; align-items: center;">
+        <label for="sourceSelect" style="color: #94a3b8; font-size: 0.9rem;">Filter Source:</label>
+        <select name="source" id="sourceSelect" onchange="this.form.submit()"
+            style="padding: 0.5rem 1rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); outline: none;">
+            <option value="all" {% if current_source=='all' %}selected{% endif %}>🌍 All Sources</option>
+            <option value="google_maps" {% if current_source=='google_maps' %}selected{% endif %}>📍 Google Maps
+            </option>
+            <option value="instagram" {% if current_source=='instagram' %}selected{% endif %}>📸 Instagram</option>
+            <option value="facebook" {% if current_source=='facebook' %}selected{% endif %}>📘 Facebook</option>
+            <option value="directories" {% if current_source=='directories' %}selected{% endif %}>📋 Yelp/Directories
+            </option>
+        </select>
+    </form>
+</div>
+
+<!-- NEW LEADS -->
+<div id="tab-new" class="tab-content active" style="margin-top: 1.5rem;">
+    {% if not leads_new %}
+    <div class="empty-state">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🎯</div>
+        <h3>No new manual leads</h3>
+        <p>Run a search to discover businesses with no website.</p>
+    </div>
+    {% else %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem;">
+        {% for lead in leads_new %}
+        {% set phone_clean = lead.phone | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') |
+        replace('+', '') if lead.phone else '' %}
+        {% set wa_link = 'https://wa.me/' + phone_clean + '?text=' + ('Hi! I saw your business and wanted to connect.' |
+        urlencode) if phone_clean else '' %}
+        <div class="card" style="margin: 0;">
+            <div class="card-body" style="padding: 1rem 1.25rem;">
+                <!-- Header -->
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                    <div>
+                        <h4 style="margin: 0; font-size: 1rem; font-weight: 600; color: #e2e8f0;">{{ lead.business_name
+                            }}</h4>
+                        <span style="font-size: 0.8rem; color: #94a3b8;">{{ lead.city or '' }} {% if lead.category %}·
+                            {{ lead.category }}{% endif %}</span>
+
+                        <div style="margin-top: 0.35rem;">
+                            {% if lead.source == 'google_maps' %}
+                            <span class="status-badge"
+                                style="background: rgba(66, 133, 244, 0.1); color: #4285F4; border: 1px solid rgba(66, 133, 244, 0.2); padding: 0.15rem 0.4rem;">📍
+                                Maps</span>
+                            {% elif lead.source == 'instagram' %}
+                            <span class="status-badge"
+                                style="background: rgba(225, 48, 108, 0.1); color: #E1306C; border: 1px solid rgba(225, 48, 108, 0.2); padding: 0.15rem 0.4rem;">📸
+                                IG</span>
+                            {% elif lead.source == 'facebook' %}
+                            <span class="status-badge"
+                                style="background: rgba(24, 119, 242, 0.1); color: #1877F2; border: 1px solid rgba(24, 119, 242, 0.2); padding: 0.15rem 0.4rem;">📘
+                                FB</span>
+                            {% elif lead.source == 'directories' %}
+                            <span class="status-badge"
+                                style="background: rgba(211, 35, 35, 0.1); color: #d32323; border: 1px solid rgba(211, 35, 35, 0.2); padding: 0.15rem 0.4rem;">📋
+                                Yelp</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if lead.google_rating %}
+                    <div
+                        style="background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2); border-radius: 8px; padding: 0.25rem 0.5rem; font-size: 0.8rem; color: #fbbf24; white-space: nowrap;">
+                        ⭐ {{ lead.google_rating }} <span style="color: #64748b;">({{ lead.review_count }})</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Socials -->
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+                    {% if lead.social_link %}
+                    {% if 'instagram.com' in lead.social_link %}
+                    <a href="{{ lead.social_link }}" target="_blank"
+                        style="display:inline-flex; align-items:center; gap:0.35rem; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.82rem; font-weight: 500; text-decoration: none; background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045); color: white;">
+                        📸 Instagram
+                    </a>
+                    {% elif 'facebook.com' in lead.social_link %}
+                    <a href="{{ lead.social_link }}" target="_blank"
+                        style="display:inline-flex; align-items:center; gap:0.35rem; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.82rem; font-weight: 500; text-decoration: none; background: #1877f2; color: white;">
+                        👤 Facebook
+                    </a>
+                    {% elif 'wa.me' in lead.social_link or 'whatsapp' in lead.social_link %}
+                    <a href="{{ lead.social_link }}" target="_blank"
+                        style="display:inline-flex; align-items:center; gap:0.35rem; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.82rem; font-weight: 500; text-decoration: none; background: #25d366; color: white;">
+                        💬 WhatsApp
+                    </a>
+                    {% else %}
+                    <a href="{{ lead.social_link }}" target="_blank"
+                        style="display:inline-flex; align-items:center; gap:0.35rem; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.82rem; font-weight: 500; text-decoration: none; background: rgba(255,255,255,0.08); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1);">
+                        🔗 Link
+                    </a>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if wa_link %}
+                    <a href="{{ wa_link }}" target="_blank"
+                        style="display:inline-flex; align-items:center; gap:0.35rem; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.82rem; font-weight: 500; text-decoration: none; background: #25d366; color: white;">
+                        💬 WhatsApp
+                    </a>
+                    {% elif lead.phone %}
+                    <span
+                        style="display:inline-flex; align-items:center; gap:0.35rem; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.82rem; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.08);">
+                        📞 {{ lead.phone }}
+                    </span>
+                    {% endif %}
+
+                    {% if not lead.phone and not lead.social_link %}
+                    <span style="font-size: 0.8rem; color: #64748b; font-style: italic;">No contact info found</span>
+                    {% endif %}
+                </div>
+
+                <!-- DM Script -->
+                <details style="margin-bottom: 0.85rem;">
+                    <summary
+                        style="cursor:pointer; font-size: 0.82rem; color: #63b3ed; list-style: none; display: flex; align-items: center; gap: 0.35rem;">
+                        ✍️ <span>Copy DM Script</span>
+                    </summary>
+                    <div id="dm-{{ lead.id }}"
+                        style="margin-top: 0.6rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.75rem; font-size: 0.82rem; color: #94a3b8; white-space: pre-wrap; line-height: 1.6;">
+                        Hi {{ lead.business_name }}! 👋
+
+                        I noticed your business doesn't have a website yet. I'm a web designer and I'd love to create a
+                        free prototype for you so you can see exactly what your site could look like — no commitment
+                        needed.
+
+                        Would you be interested? I can have something ready for you in 24 hours! 🚀
+
+                        Best, Rayen
+                        https://rayenlazizi.tech</div>
+                    <button onclick="copyDM('dm-{{ lead.id }}')"
+                        style="margin-top: 0.5rem; background: rgba(99,179,237,0.1); border: 1px solid rgba(99,179,237,0.2); color: #63b3ed; border-radius: 6px; padding: 0.3rem 0.75rem; cursor: pointer; font-size: 0.8rem;">
+                        📋 Copy to clipboard
+                    </button>
+                </details>
+
+                <!-- Actions -->
+                <div style="display: flex; gap: 0.5rem;">
+                    <form action="{{ url_for('update_manual_lead', lead_id=lead.id) }}" method="POST" style="flex: 1;">
+                        <input type="hidden" name="status" value="contacted">
+                        <button type="submit" class="btn btn-primary"
+                            style="width: 100%; font-size: 0.82rem; padding: 0.4rem 0.75rem;">✓ Mark Contacted</button>
+                    </form>
+                    <form action="{{ url_for('update_manual_lead', lead_id=lead.id) }}" method="POST">
+                        <input type="hidden" name="status" value="ignored">
+                        <button type="submit" class="btn btn-outline"
+                            style="font-size: 0.82rem; padding: 0.4rem 0.75rem; border-color: rgba(255,255,255,0.1); color: #64748b;">Skip</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- CONTACTED LEADS -->
+<div id="tab-contacted" class="tab-content" style="display: none; margin-top: 1.5rem;">
+    {% if not leads_contacted %}
+    <div class="empty-state">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+        <h3>No contacted leads yet</h3>
+    </div>
+    {% else %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+        {% for lead in leads_contacted %}
+        {% set phone_clean = lead.phone | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') |
+        replace('+', '') if lead.phone else '' %}
+        <div class="card" style="margin: 0; border-color: rgba(72,187,120,0.2);">
+            <div class="card-body" style="padding: 1rem 1.25rem;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                    <div>
+                        <h4 style="margin: 0; font-size: 1rem; font-weight: 600; color: #e2e8f0;">{{ lead.business_name
+                            }}</h4>
+                        <span style="font-size: 0.8rem; color: #94a3b8;">{{ lead.city or '' }}</span>
+                    </div>
+                    <span
+                        style="background: rgba(72,187,120,0.1); color: #48bb78; border: 1px solid rgba(72,187,120,0.2); border-radius: 6px; padding: 0.2rem 0.5rem; font-size: 0.75rem; font-weight: 600;">✓
+                        Contacted</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                    {% if lead.social_link %}
+                    <a href="{{ lead.social_link }}" target="_blank"
+                        style="font-size: 0.8rem; color: #63b3ed; text-decoration: none;">🔗 View Profile</a>
+                    {% endif %}
+                    {% if phone_clean %}
+                    <a href="https://wa.me/{{ phone_clean }}" target="_blank"
+                        style="font-size: 0.8rem; color: #48bb78; text-decoration: none;">💬 WhatsApp</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+        btn.classList.add('active');
+        document.getElementById(tabId).style.display = 'block';
+    }
+    function copyDM(id) {
+        const text = document.getElementById(id).innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            btn.textContent = '✅ Copied!';
+            setTimeout(() => btn.textContent = '📋 Copy to clipboard', 2000);
+        });
+    }
+</script>
+{% endblock %}

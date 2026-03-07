@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Analytics — ClientEngine{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>Analytics</h1>
+    <p class="subtitle">Track your outreach performance</p>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card stat-primary">
+        <div class="stat-icon">📨</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.sent }}</span>
+            <span class="stat-label">Emails Sent</span>
+        </div>
+    </div>
+    <div class="stat-card stat-success">
+        <div class="stat-icon">💬</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.replies }}</span>
+            <span class="stat-label">Replies</span>
+        </div>
+    </div>
+    <div class="stat-card stat-accent">
+        <div class="stat-icon">📈</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.rate }}%</span>
+            <span class="stat-label">Reply Rate</span>
+        </div>
+    </div>
+    <div class="stat-card stat-warning">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.bounced }}</span>
+            <span class="stat-label">Bounced</span>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<!-- Insights Dashboard -->
+<div class="card" style="margin-top: 2rem;">
+    <div class="card-header">
+        <h3>Insights Breakdown (v5 Engine)</h3>
+    </div>
+    <div class="card-body no-padding">
+        <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; padding: 1.5rem;">
+
+            <!-- Source Breakdown -->
+            <div
+                style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <h4
+                    style="margin-bottom: 1rem; color: #a0aec0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                    By Source</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for src in sources %}
+                    <li
+                        style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <span style="display: flex; align-items: center; gap: 0.5rem;">
+                            {% if src.source == 'google_maps' %}📍 Maps
+                            {% elif src.source == 'instagram' %}📸 Instagram
+                            {% elif src.source == 'facebook' %}📘 Facebook
+                            {% elif src.source == 'directories' %}📋 Yelp
+                            {% else %}{{ src.source }}{% endif %}
+                        </span>
+                        <strong
+                            style="color: #e2e8f0; background: rgba(255,255,255,0.1); padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.85rem;">{{
+                            src.count }}</strong>
+                    </li>
+                    {% else %}
+                    <li style="color: #718096; font-size: 0.85rem;">No data yet</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Tier Breakdown -->
+            <div
+                style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <h4
+                    style="margin-bottom: 1rem; color: #a0aec0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                    By Priority Tier</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for t in tiers %}
+                    <li
+                        style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <span style="display: flex; align-items: center; gap: 0.5rem;">
+                            {% if t.tier == 1 %}🔥 Tier 1 (Hot)
+                            {% elif t.tier == 2 %}⚡ Tier 2 (Warm)
+                            {% else %}❄️ Tier 3 (Cold)
+                            {% endif %}
+                        </span>
+                        <strong
+                            style="color: #e2e8f0; background: rgba(255,255,255,0.1); padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.85rem;">{{
+                            t.count }}</strong>
+                    </li>
+                    {% else %}
+                    <li style="color: #718096; font-size: 0.85rem;">No data yet</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Channel Breakdown -->
+            <div
+                style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <h4
+                    style="margin-bottom: 1rem; color: #a0aec0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                    By Output Channel</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for ch in channels %}
+                    <li
+                        style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <span style="display: flex; align-items: center; gap: 0.5rem;">
+                            {% if ch.outreach_channel == 'instagram_dm' %}📸 IG DM
+                            {% elif ch.outreach_channel == 'whatsapp' %}💬 WhatsApp
+                            {% else %}📧 Cold Email
+                            {% endif %}
+                        </span>
+                        <strong
+                            style="color: #e2e8f0; background: rgba(255,255,255,0.1); padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.85rem;">{{
+                            ch.count }}</strong>
+                    </li>
+                    {% else %}
+                    <li style="color: #718096; font-size: 0.85rem;">No data yet</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Pipeline History -->
+{% if runs %}
+<div class="card">
+    <div class="card-header">
+        <h3>Search History</h3>
+    </div>
+    <div class="card-body no-padding">
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Search</th>
+                        <th>Found</th>
+                        <th>Qualified</th>
+                        <th>Sent</th>
+                        <th>Bounced</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in runs %}
+                    <tr>
+                        <td class="text-muted nowrap">{{ r.created_at[:16] if r.created_at else '' }}</td>
+                        <td><strong>{{ r.query }}</strong> {{ r.location }}</td>
+                        <td>{{ r.found }}</td>
+                        <td>{{ r.qualified }}</td>
+                        <td>{{ r.sent }}</td>
+                        <td>{{ r.bounced }}</td>
+                        <td><span class="status-badge status-{{ r.status }}">{{ r.status }}</span></td>
+                        <td>
+                            <a href="/results/{{ r.id }}" class="btn btn-xs btn-outline">View</a>
+                            {% if r.status == 'sending' %}
+                            <form method="POST" action="/stop_pipeline/{{ r.id }}" style="display:inline;"
+                                onsubmit="return confirm('Force Stop this pipeline from sending any more emails?');">
+                                <button type="submit" class="btn btn-xs btn-outline"
+                                    style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;">🛑
+                                    Stop</button>
+                            </form>
+                            {% endif %}
+                            <form method="POST" action="/api/pipeline/{{ r.id }}/delete" style="display:inline;"
+                                onsubmit="return confirm('Delete this pipeline run entirely?');">
+                                <button type="submit" class="btn btn-xs btn-outline"
+                                    style="border-color: #e74c3c; color: #e74c3c; margin-left: 0.25rem;"
+                                    title="Delete">🗑️</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Email Log -->
+<div class="card">
+    <div class="card-header">
+        <h3>Email Log</h3>
+    </div>
+    <div class="card-body no-padding">
+        {% if logs %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Business</th>
+                        <th>Subject</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="text-muted nowrap">{{ log.sent_at[:16] if log.sent_at else '' }}</td>
+                        <td><strong>{{ log.business_name or '—' }}</strong><br>
+                            <span class="text-muted">{{ log.lead_email or '' }}</span>
+                        </td>
+                        <td class="truncate">{{ log.subject or '' }}</td>
+                        <td>
+                            {% if log.replied %}
+                            <span class="status-badge status-replied">Replied ✓</span>
+                            {% elif log.status == 'sent' %}
+                            <span class="status-badge status-sent">Sent</span>
+                            {% elif log.status == 'bounced' %}
+                            <span class="status-badge status-bounced">Bounced</span>
+                            {% elif log.status == 'failed' %}
+                            <span class="status-badge status-failed">Failed</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.status == 'sent' and not log.replied %}
+                            <form method="POST" action="/log/{{ log.id }}/replied" style="display:inline">
+                                <button type="submit" class="btn btn-xs btn-success">✓ Got Reply</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No emails sent yet. <a href="/">Search for businesses</a> to get started.</div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // The aggressive page reload polling has been removed.
+    // The user can manually refresh the page to see live sends,
+    // preventing the UI from locking up or losing state during navigation.
+</script>
+{% endblock %}

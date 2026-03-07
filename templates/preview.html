@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Email Preview — ClientEngine{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>📧 Email Preview</h1>
+    <p class="subtitle">Review before sending — Campaign: {{ campaign.name if campaign else 'Unknown' }}</p>
+</div>
+
+<!-- Summary -->
+<div class="stats-grid">
+    <div class="stat-card stat-success">
+        <div class="stat-icon">✅</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ preview.total_ready }}</span>
+            <span class="stat-label">Ready to Send</span>
+        </div>
+    </div>
+    <div class="stat-card stat-warning">
+        <div class="stat-icon">⏭️</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ preview.total_skip }}</span>
+            <span class="stat-label">Will Skip</span>
+        </div>
+    </div>
+</div>
+
+<!-- Spam Warnings -->
+{% if preview.spam_warnings %}
+<div class="alert alert-warning">
+    <div>
+        <strong>⚠️ Spam Warnings:</strong><br>
+        {% for w in preview.spam_warnings %}
+        • {{ w }}<br>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Actions -->
+<div class="actions-bar">
+    <form method="POST" action="/campaigns/{{ campaign.id }}/send">
+        <button type="submit" class="btn btn-accent"
+            onclick="return confirm('Send {{ preview.total_ready }} emails now?')">
+            🚀 Approve & Send All ({{ preview.total_ready }})
+        </button>
+    </form>
+    <a href="/campaigns" class="btn btn-outline">← Cancel (Go Back)</a>
+</div>
+
+<!-- Email Previews -->
+{% for p in preview.previews %}
+<div class="card {% if p.status == 'skip' %}card-dimmed{% endif %}">
+    <div class="card-header">
+        <div style="display:flex;align-items:center;gap:0.75rem">
+            {% if p.status == 'ready' %}
+            <span class="status-badge status-active">Ready</span>
+            {% else %}
+            <span class="status-badge status-paused">Skip: {{ p.reason }}</span>
+            {% endif %}
+            <strong>{{ p.business_name }}</strong>
+            {% if p.email %}
+            <span class="text-muted">→ {{ p.email }}</span>
+            {% endif %}
+        </div>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+            {% if p.step %}
+            <span class="step-badge step-{{ p.step }}">Email {{ p.step }}</span>
+            {% endif %}
+            {% if p.tier %}
+            <span class="tier-badge tier-{{ p.tier }}">T{{ p.tier }}</span>
+            {% endif %}
+            {% if p.score %}
+            <span
+                class="score-badge score-{% if p.score >= 90 %}high{% elif p.score >= 75 %}medium{% else %}normal{% endif %}">{{
+                p.score }}</span>
+            {% endif %}
+            {% if p.spam_score is defined and p.spam_score > 0 %}
+            <span class="status-badge {% if p.spam_safe %}status-active{% else %}status-paused{% endif %}">
+                Spam: {{ p.spam_score }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    {% if p.subject %}
+    <div class="card-body">
+        <div style="margin-bottom:0.75rem">
+            <strong>Subject:</strong> {{ p.subject }}
+        </div>
+        <pre class="email-preview">{{ p.body }}</pre>
+        {% if p.spam_warnings %}
+        <div style="margin-top:0.75rem">
+            {% for w in p.spam_warnings %}
+            <span class="status-badge status-paused" style="margin-right:0.25rem">⚠ {{ w }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+
+{% if not preview.previews %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">No emails due for this campaign. Enroll leads or wait for the next scheduled send.
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

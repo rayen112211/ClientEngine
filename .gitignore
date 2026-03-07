@@ -1,0 +1,24 @@
+# Environment Variables
+.env
+
+# Database
+data/
+*.db
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+.venv/
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# Any random test files created during development
+test_*.py
+debug_*.py

@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Campaigns — ClientEngine{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Campaigns</h1>
+    <p class="subtitle">Create and manage email sequences</p>
+</div>
+
+<div class="actions-bar">
+    <button class="btn btn-primary" onclick="toggleModal('createCampaignModal')">+ New Campaign</button>
+</div>
+
+<!-- Campaigns List -->
+{% if campaigns %}
+<div class="campaigns-grid">
+    {% for c in campaigns %}
+    <div class="card campaign-card">
+        <div class="card-header">
+            <h3>{{ c.name }}</h3>
+            <span class="status-badge status-{{ c.status }}">{{ c.status }}</span>
+        </div>
+        <div class="card-body">
+            <div class="campaign-stats">
+                <div class="campaign-stat">
+                    <span class="cs-value">{{ c.total_leads }}</span>
+                    <span class="cs-label">Leads</span>
+                </div>
+                <div class="campaign-stat">
+                    <span class="cs-value">{{ c.total_sent }}</span>
+                    <span class="cs-label">Sent</span>
+                </div>
+                <div class="campaign-stat">
+                    <span class="cs-value">{{ c.total_replied }}</span>
+                    <span class="cs-label">Replies</span>
+                </div>
+                <div class="campaign-stat">
+                    <span class="cs-value">{{ ("%.1f"|format(c.total_replied / c.total_sent * 100)) if c.total_sent > 0
+                        else '0' }}%</span>
+                    <span class="cs-label">Rate</span>
+                </div>
+            </div>
+
+            <div class="campaign-meta">
+                <div><strong>Min Score:</strong> {{ c.min_score }}+</div>
+                <div><strong>From:</strong> {{ c.from_name }}</div>
+                <div><strong>Delay:</strong> {{ c.delay_min_seconds }}–{{ c.delay_max_seconds }}s</div>
+                <div><strong>Created:</strong> {{ c.created_at[:10] if c.created_at else '' }}</div>
+            </div>
+
+            <div class="campaign-actions">
+                <form method="POST" action="/campaigns/{{ c.id }}/enroll" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-secondary">📋 Enroll Leads</button>
+                </form>
+
+                {% if c.status == 'active' %}
+                <a href="/campaigns/{{ c.id }}/preview" class="btn btn-sm btn-secondary">👁️ Preview</a>
+                <form method="POST" action="/campaigns/{{ c.id }}/send" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-accent">📨 Send Due Emails</button>
+                </form>
+                <form method="POST" action="/campaigns/{{ c.id }}/pause" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-outline">⏸ Pause</button>
+                </form>
+                {% elif c.status in ('draft', 'paused') %}
+                <form method="POST" action="/campaigns/{{ c.id }}/activate" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-primary">▶ Activate</button>
+                </form>
+                <a href="/campaigns/{{ c.id }}/preview" class="btn btn-sm btn-secondary">👁️ Preview</a>
+                <form method="POST" action="/campaigns/{{ c.id }}/send" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-accent">📨 Send Due Emails</button>
+                </form>
+                {% endif %}
+
+                <a href="/log?campaign_id={{ c.id }}" class="btn btn-sm btn-outline">📊 View Log</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <p>No campaigns yet. Create your first campaign to start sending targeted emails.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Workflow Diagram -->
+<div class="card" style="margin-top: 2rem">
+    <div class="card-header">
+        <h3>How Campaigns Work</h3>
+    </div>
+    <div class="card-body">
+        <div class="workflow-steps">
+            <div class="wf-step">
+                <div class="wf-number">1</div>
+                <div class="wf-text"><strong>Create Campaign</strong><br>Set name, min score, target types</div>
+            </div>
+            <div class="wf-arrow">→</div>
+            <div class="wf-step">
+                <div class="wf-number">2</div>
+                <div class="wf-text"><strong>Enroll Leads</strong><br>Auto-selects qualified leads (score ≥ 60)</div>
+            </div>
+            <div class="wf-arrow">→</div>
+            <div class="wf-step">
+                <div class="wf-number">3</div>
+                <div class="wf-text"><strong>Send Emails</strong><br>Sends next due email in sequence</div>
+            </div>
+            <div class="wf-arrow">→</div>
+            <div class="wf-step">
+                <div class="wf-number">4</div>
+                <div class="wf-text"><strong>Follow Up</strong><br>5 emails over 21 days automatically</div>
+            </div>
+            <div class="wf-arrow">→</div>
+            <div class="wf-step">
+                <div class="wf-number">5</div>
+                <div class="wf-text"><strong>Track Results</strong><br>Mark replies, analyze conversions</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Campaign Modal -->
+<div class="modal" id="createCampaignModal">
+    <div class="modal-backdrop" onclick="toggleModal('createCampaignModal')"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create New Campaign</h3>
+            <button class="modal-close" onclick="toggleModal('createCampaignModal')">×</button>
+        </div>
+        <form method="POST" action="/campaigns/create">
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label>Campaign Name *</label>
+                        <input type="text" name="name" required placeholder="e.g. Italy Restaurants Q1 2026">
+                    </div>
+                    <div class="form-group">
+                        <label>From Name</label>
+                        <input type="text" name="from_name" value="Rayen">
+                    </div>
+                    <div class="form-group">
+                        <label>From Email</label>
+                        <input type="email" name="from_email" placeholder="your@email.com">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Portfolio Link</label>
+                        <input type="text" name="portfolio_link" value="https://rayenlazizi.tech">
+                    </div>
+                    <div class="form-group">
+                        <label>Min Qualification Score</label>
+                        <input type="number" name="min_score" value="60" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Delay Between Emails (sec)</label>
+                        <div style="display:flex; gap:0.5rem">
+                            <input type="number" name="delay_min_seconds" value="60" placeholder="Min"
+                                style="width:50%">
+                            <input type="number" name="delay_max_seconds" value="180" placeholder="Max"
+                                style="width:50%">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Target Business Types</label>
+                    <div class="checkbox-grid">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="target_business_types" value="all" checked> All Types
+                        </label>
+                        {% for key, info in business_types.items() %}
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="target_business_types" value="{{ key }}"> {{ info.label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Target Tiers</label>
+                    <div class="checkbox-grid">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="target_tiers" value="1" checked> Tier 1 — Priority (90+)
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="target_tiers" value="2" checked> Tier 2 — Good (75-89)
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="target_tiers" value="3" checked> Tier 3 — Normal (60-74)
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline"
+                    onclick="toggleModal('createCampaignModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Campaign</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

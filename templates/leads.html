@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Leads — ClientEngine{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Leads</h1>
+    <p class="subtitle">{{ stats.total }} total — Manage, import, and qualify your leads</p>
+</div>
+
+<!-- Actions Bar -->
+<div class="actions-bar">
+    <button class="btn btn-primary" onclick="toggleModal('addLeadModal')">+ Add Lead</button>
+    <button class="btn btn-secondary" onclick="toggleModal('importModal')">📁 Import CSV</button>
+    <form method="POST" action="/leads/enrich" style="display:inline">
+        <input type="hidden" name="check_websites" value="on">
+        <input type="hidden" name="only_new" value="on">
+        <button type="submit" class="btn btn-accent">🔍 Enrich All New</button>
+    </form>
+    <a href="/leads/export" class="btn btn-outline">📥 Export CSV</a>
+</div>
+
+<!-- Filters -->
+<div class="filter-bar">
+    <form method="GET" action="/leads" class="filter-form">
+        <select name="status" onchange="this.form.submit()">
+            <option value="">All Status</option>
+            <option value="new" {{ 'selected' if current_filters.status=='new' }}>New</option>
+            <option value="enriched" {{ 'selected' if current_filters.status=='enriched' }}>Enriched</option>
+            <option value="active" {{ 'selected' if current_filters.status=='active' }}>Active</option>
+            <option value="completed" {{ 'selected' if current_filters.status=='completed' }}>Completed</option>
+        </select>
+        <select name="tier" onchange="this.form.submit()">
+            <option value="">All Tiers</option>
+            <option value="1" {{ 'selected' if current_filters.tier==1 }}>Tier 1 — Priority</option>
+            <option value="2" {{ 'selected' if current_filters.tier==2 }}>Tier 2 — Good</option>
+            <option value="3" {{ 'selected' if current_filters.tier==3 }}>Tier 3 — Lower</option>
+        </select>
+        <select name="business_type" onchange="this.form.submit()">
+            <option value="">All Types</option>
+            {% for key, info in business_types.items() %}
+            <option value="{{ key }}" {{ 'selected' if current_filters.business_type==key }}>{{ info.label }}</option>
+            {% endfor %}
+        </select>
+        <select name="min_score" onchange="this.form.submit()">
+            <option value="">Any Score</option>
+            <option value="90" {{ 'selected' if current_filters.min_score==90 }}>90+ (Priority)</option>
+            <option value="75" {{ 'selected' if current_filters.min_score==75 }}>75+ (Premium)</option>
+            <option value="60" {{ 'selected' if current_filters.min_score==60 }}>60+ (Normal)</option>
+        </select>
+        {% if current_filters.status or current_filters.tier or current_filters.business_type or
+        current_filters.min_score %}
+        <a href="/leads" class="btn btn-sm btn-outline">Clear Filters</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Leads Table -->
+<div class="card">
+    <div class="card-body no-padding">
+        {% if leads %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Business</th>
+                        <th>Email</th>
+                        <th>Type</th>
+                        <th>City</th>
+                        <th>Website</th>
+                        <th>Rating</th>
+                        <th>Score</th>
+                        <th>Tier</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lead in leads %}
+                    <tr>
+                        <td><strong>{{ lead.business_name }}</strong></td>
+                        <td class="text-muted truncate">{{ lead.email or '—' }}</td>
+                        <td>
+                            {% if lead.business_type %}
+                            <span class="type-badge-sm type-{{ lead.business_type }}">{{ lead.business_type }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ lead.city or '—' }}</td>
+                        <td>
+                            {% if lead.website %}
+                            <span class="ws-badge ws-{{ lead.website_status }}">{{ lead.website_status }}</span>
+                            {% else %}
+                            <span class="ws-badge ws-none">none</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if lead.google_rating %}
+                            ⭐ {{ lead.google_rating }} ({{ lead.review_count }})
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span
+                                class="score-badge score-{% if lead.qualification_score >= 90 %}high{% elif lead.qualification_score >= 75 %}medium{% elif lead.qualification_score >= 60 %}normal{% else %}low{% endif %}">
+                                {{ lead.qualification_score }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if lead.tier and lead.qualification_score > 0 %}
+                            <span class="tier-badge tier-{{ lead.tier }}">T{{ lead.tier }}</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td><span class="status-badge status-{{ lead.status }}">{{ lead.status }}</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <form method="POST" action="/leads/{{ lead.id }}/enrich" style="display:inline">
+                                    <button type="submit" class="btn btn-xs btn-outline" title="Enrich">🔍</button>
+                                </form>
+                                <form method="POST" action="/leads/{{ lead.id }}/delete" style="display:inline"
+                                    onsubmit="return confirm('Delete this lead?')">
+                                    <button type="submit" class="btn btn-xs btn-danger" title="Delete">🗑</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 3rem">
+            <p>No leads found. Import a CSV or add leads manually.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Lead Modal -->
+<div class="modal" id="addLeadModal">
+    <div class="modal-backdrop" onclick="toggleModal('addLeadModal')"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add New Lead</h3>
+            <button class="modal-close" onclick="toggleModal('addLeadModal')">×</button>
+        </div>
+        <form method="POST" action="/leads/add">
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Business Name *</label>
+                        <input type="text" name="business_name" required placeholder="e.g. Pizzeria Roma">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email" placeholder="info@business.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="text" name="phone" placeholder="+39 ...">
+                    </div>
+                    <div class="form-group">
+                        <label>Website</label>
+                        <input type="text" name="website" placeholder="https://...">
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <input type="text" name="category" placeholder="e.g. ristorante">
+                    </div>
+                    <div class="form-group">
+                        <label>City</label>
+                        <input type="text" name="city" placeholder="e.g. Milano">
+                    </div>
+                    <div class="form-group">
+                        <label>Country</label>
+                        <input type="text" name="country" value="Italy">
+                    </div>
+                    <div class="form-group">
+                        <label>Google Rating</label>
+                        <input type="number" name="google_rating" min="0" max="5" step="0.1" placeholder="4.5">
+                    </div>
+                    <div class="form-group">
+                        <label>Review Count</label>
+                        <input type="number" name="review_count" min="0" placeholder="120">
+                    </div>
+                    <div class="form-group">
+                        <label>Area Type</label>
+                        <select name="area_type">
+                            <option value="standard">Standard</option>
+                            <option value="wealthy">Wealthy</option>
+                            <option value="tourist">Tourist</option>
+                            <option value="commercial">Commercial</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Year Opened</label>
+                        <input type="number" name="year_opened" placeholder="2020">
+                    </div>
+                    <div class="form-group">
+                        <label>Competition</label>
+                        <select name="competition_level">
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="running_ads"> Running paid ads?
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="toggleModal('addLeadModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Lead</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Import CSV Modal -->
+<div class="modal" id="importModal">
+    <div class="modal-backdrop" onclick="toggleModal('importModal')"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Import Leads from CSV</h3>
+            <button class="modal-close" onclick="toggleModal('importModal')">×</button>
+        </div>
+        <form method="POST" action="/leads/import" enctype="multipart/form-data">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Upload CSV File</label>
+                    <input type="file" name="csv_file" accept=".csv">
+                </div>
+                <div class="divider-text">OR paste CSV text directly</div>
+                <div class="form-group">
+                    <label>CSV Text</label>
+                    <textarea name="csv_text" rows="8" placeholder="business_name,email,website,category,city,google_rating,review_count
+Pizzeria Roma,info@pizzeriaroma.it,www.pizzeriaroma.it,ristorante,Milano,4.5,120
+Hotel Bella Vista,,www.hotelbv.com,hotel,Roma,4.2,89"></textarea>
+                </div>
+                <div class="info-box">
+                    <strong>Expected columns:</strong> business_name, email, phone, website, category, city, country,
+                    google_rating, review_count, running_ads, area_type, year_opened, competition_level
+                    <br><br>
+                    Only <code>business_name</code> is required. Other fields are optional.
+                    Duplicate emails are automatically skipped.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="toggleModal('importModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Import</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
