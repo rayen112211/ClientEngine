@@ -9,7 +9,7 @@ import random
 import threading
 import traceback
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import (
     Flask, render_template, request, redirect, url_for,
     flash, jsonify,
@@ -249,6 +249,14 @@ def _is_send_worker_active(pipeline_id):
         return pipeline_id in _active_send_workers
 
 
+def _first_active_send_worker(exclude_pipeline_id=None):
+    with _send_worker_lock:
+        for pid in _active_send_workers:
+            if exclude_pipeline_id is None or pid != exclude_pipeline_id:
+                return pid
+    return None
+
+
 def _set_send_worker_active(pipeline_id, active):
     with _send_worker_lock:
         if active:
@@ -372,6 +380,11 @@ def reset_manual_leads():
 def send_all_ready():
     """Trigger sending for ALL 'ready' pipeline runs, one by one in the background."""
     global _send_all_running
+    active_pid = _first_active_send_worker()
+    if active_pid:
+        flash(f"Pipeline #{active_pid} is already sending. Wait for it to finish before Send All.", "warning")
+        return redirect(url_for("analytics_page"))
+
     with _send_all_lock:
         if _send_all_running:
             flash("â³ Already sending â€” wait for current batch to finish before pressing again.", "warning")
@@ -1051,6 +1064,20 @@ def _do_send_pipeline(pipeline_id):
             delay_max = delay_min
         hourly_limit = _parse_int_setting("smtp_hourly_limit", 500, minimum=0, maximum=500000)
         daily_limit = _parse_int_setting("smtp_daily_limit", 2000, minimum=0, maximum=500000)
+        if hourly_limit > 0:
+            # Prevent configured delay from violating the declared hourly cap.
+            min_delay_for_hourly_limit = max(5, int((3600 + hourly_limit - 1) / hourly_limit))
+            if delay_min < min_delay_for_hourly_limit:
+                _pipeline_log(
+                    pipeline_id,
+                    "send_throttle",
+                    f"raising delay_min from {delay_min}s to {min_delay_for_hourly_limit}s to respect hourly cap {hourly_limit}/h",
+                    level="warning",
+                )
+                delay_min = min_delay_for_hourly_limit
+            if delay_max < delay_min:
+                delay_max = delay_min
+
         micro_test_on = settings.get("micro_test_enabled", "true").lower() == "true"
         micro_test_size = _parse_int_setting("micro_test_size", 2, minimum=1, maximum=10)
         pause_on_bounce = settings.get("pause_on_bounce", "true").lower() == "true"
@@ -1110,10 +1137,54 @@ def _do_send_pipeline(pipeline_id):
             )
             return any(hint in text for hint in transient_hints)
 
+        def _provider_cooldown_remaining_seconds():
+            pattern = "%too many messages from sender in last 60 minutes%"
+            try:
+                with db_session() as conn:
+                    row = conn.execute(
+                        """
+                        SELECT sent_at
+                        FROM email_log
+                        WHERE status='failed' AND lower(error_message) LIKE lower(?)
+                        ORDER BY id DESC
+                        LIMIT 1
+                        """,
+                        (pattern,),
+                    ).fetchone()
+            except Exception:
+                return 0
+
+            if not row or not row["sent_at"]:
+                return 0
+
+            raw_ts = str(row["sent_at"]).replace("Z", "+00:00")
+            try:
+                last_hit = datetime.fromisoformat(raw_ts)
+            except Exception:
+                return 0
+            if getattr(last_hit, "tzinfo", None) is not None:
+                last_hit = last_hit.replace(tzinfo=None)
+
+            elapsed = (datetime.utcnow() - last_hit).total_seconds()
+            return int(max(0, 3600 - elapsed))
+
         for i, biz in enumerate(qualified):
             if _abort_check():
                 _pipeline_log(pipeline_id, "send_stopped", f"aborted at lead {i + 1}")
                 break
+
+            cooldown_remaining = _provider_cooldown_remaining_seconds()
+            if cooldown_remaining > 0:
+                wait_min = max(1, int((cooldown_remaining + 59) / 60))
+                cooldown_message = (
+                    f"Provider cooldown active ({wait_min}m remaining after last rate-limit response)."
+                )
+                _pipeline_log(pipeline_id, "send_paused", cooldown_message, level="warning")
+                _flush_counters()
+                with db_session() as conn:
+                    conn.execute("UPDATE pipeline_runs SET status=? WHERE id=?", (STATUS_PAUSED, pipeline_id))
+                    conn.commit()
+                return
 
             quota_hit, quota_message = _quota_blocked()
             if quota_hit:
@@ -1325,6 +1396,14 @@ def _do_send_pipeline(pipeline_id):
 
 def send_emails(pipeline_id):
     """Send emails to all qualified businesses from a pipeline run."""
+    active_pid = _first_active_send_worker(exclude_pipeline_id=pipeline_id)
+    if active_pid:
+        flash(
+            f"Pipeline #{active_pid} is currently sending. Wait for it to finish before starting another.",
+            "warning",
+        )
+        return redirect(url_for("analytics_page"))
+
     conn = get_db()
     try:
         run = conn.execute("SELECT * FROM pipeline_runs WHERE id=?", (pipeline_id,)).fetchone()
@@ -1557,6 +1636,16 @@ def settings_page():
 def update_settings_route():
     send_delay_min = _setting_int(request.form, "send_delay_min", 30, minimum=5, maximum=600)
     send_delay_max = _setting_int(request.form, "send_delay_max", 60, minimum=5, maximum=900)
+    smtp_hourly_limit = _setting_int(request.form, "smtp_hourly_limit", 500, minimum=0, maximum=500000)
+    smtp_daily_limit = _setting_int(request.form, "smtp_daily_limit", 2000, minimum=0, maximum=500000)
+
+    if smtp_hourly_limit > 0:
+        min_delay_for_hourly_limit = max(5, int((3600 + smtp_hourly_limit - 1) / smtp_hourly_limit))
+        if send_delay_min < min_delay_for_hourly_limit:
+            send_delay_min = min_delay_for_hourly_limit
+        if send_delay_max < send_delay_min:
+            send_delay_max = send_delay_min
+
     if send_delay_max < send_delay_min:
         send_delay_max = send_delay_min
 
@@ -1573,8 +1662,8 @@ def update_settings_route():
         "google_places_api_key": request.form.get("google_places_api_key", ""),
         "send_delay_min": str(send_delay_min),
         "send_delay_max": str(send_delay_max),
-        "smtp_hourly_limit": str(_setting_int(request.form, "smtp_hourly_limit", 500, minimum=0, maximum=500000)),
-        "smtp_daily_limit": str(_setting_int(request.form, "smtp_daily_limit", 2000, minimum=0, maximum=500000)),
+        "smtp_hourly_limit": str(smtp_hourly_limit),
+        "smtp_daily_limit": str(smtp_daily_limit),
         "smtp_timeout_seconds": str(_setting_int(request.form, "smtp_timeout_seconds", 20, minimum=5, maximum=120)),
         "imap_append_timeout_seconds": str(_setting_int(request.form, "imap_append_timeout_seconds", 10, minimum=3, maximum=60)),
         "smtp_transient_retries": str(_setting_int(request.form, "smtp_transient_retries", 2, minimum=0, maximum=5)),
@@ -1592,7 +1681,14 @@ def update_settings_route():
         "search_debug": "true" if request.form.get("search_debug") == "on" else "false",
     }
     update_settings(data)
-    flash("Settings saved âœ“", "success")
+    if smtp_hourly_limit > 0:
+        min_delay_for_hourly_limit = max(5, int((3600 + smtp_hourly_limit - 1) / smtp_hourly_limit))
+        flash(
+            f"Settings saved. Effective min delay is {min_delay_for_hourly_limit}s for {smtp_hourly_limit}/hour.",
+            "info",
+        )
+    else:
+        flash("Settings saved âœ“", "success")
     return redirect(url_for("settings_page"))
 
 
