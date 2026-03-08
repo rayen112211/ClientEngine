@@ -25,6 +25,7 @@ from database import (
     save_manual_lead, get_manual_leads, mark_manual_lead_status,
     delete_pipeline_run, reset_database,
     enqueue_searches, dequeue_next_search, complete_queue_item, get_queue_status,
+    db_session,
 )
 from business_discovery import search_businesses
 from email_extractor import find_email
@@ -379,7 +380,7 @@ def send_all_ready():
 
     conn = get_db()
     ready_runs = conn.execute(
-        "SELECT id FROM pipeline_runs WHERE status IN ('ready','partial','timeout','paused')"
+        "SELECT id FROM pipeline_runs WHERE status IN ('ready','partial','timeout')"
     ).fetchall()
     conn.close()
 
@@ -398,6 +399,17 @@ def send_all_ready():
                 try:
                     # Run synchronously, one after the other
                     _do_send_pipeline(pid)
+                    with db_session() as conn:
+                        row = conn.execute("SELECT status FROM pipeline_runs WHERE id=?", (pid,)).fetchone()
+                        final_status = normalize_status(row["status"] if row else "")
+                    if final_status == STATUS_PAUSED:
+                        _pipeline_log(
+                            pid,
+                            "send_all_halted",
+                            "stopping remaining pipelines after provider/local rate-limit",
+                            level="warning",
+                        )
+                        break
                     time.sleep(2)  # brief pause before starting the next pipeline
                 except Exception as e:
                     print(f"[Send All] Pipeline {pid} errored: {e}")
@@ -1200,16 +1212,39 @@ def _do_send_pipeline(pipeline_id):
                         break
 
             if is_rate_limited:
+                rate_error = error_msg or "SMTP provider rate limit triggered"
+                fail_count += 1
+                biz["dispatch_status"] = "failed"
+                biz["dispatch_error"] = f"Rate limited: {rate_error}"
+                try:
+                    log_email(
+                        {
+                            "lead_id": lead_id or 0,
+                            "campaign_id": 0,
+                            "sequence_step": 1,
+                            "business_type": biz.get("business_type", "other"),
+                            "subject": subject,
+                            "body": body_send,
+                            "status": "failed",
+                            "error_message": f"[{send_ts}] Rate limited: {rate_error}",
+                            "tier": biz.get("tier", 3),
+                            "qualification_score": biz.get("score", 0),
+                            "city": biz.get("city", ""),
+                            "country": "",
+                        }
+                    )
+                except Exception as exc:
+                    _pipeline_log(pipeline_id, "send_warning", f"log_email failed: {exc}", level="warning")
                 _pipeline_log(
                     pipeline_id,
                     "send_paused",
-                    f"rate limited on {email}; manual resume after cooldown",
+                    f"rate limited on {email}: {rate_error}; manual resume after cooldown",
                     level="warning",
                 )
+                _flush_counters()
                 with db_session() as conn:
                     conn.execute("UPDATE pipeline_runs SET status=? WHERE id=?", (STATUS_PAUSED, pipeline_id))
                     conn.commit()
-                _flush_counters()
                 return
 
             dispatch_status = "sent" if success else ("bounced" if is_bounce else "failed")
