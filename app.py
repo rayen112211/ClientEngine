@@ -365,7 +365,7 @@ def reset_manual_leads():
     from database import clear_all_manual_leads
     clear_all_manual_leads()
     flash("ðŸ—‘ï¸ All manual leads have been deleted.", "success")
-    return redirect(url_for("manual_leads"))
+    return redirect(url_for("manual_leads_page"))
 
 
 @app.route("/send-all-ready", methods=["POST"])
